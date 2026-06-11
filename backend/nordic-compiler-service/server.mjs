@@ -120,6 +120,9 @@ export function createArtifactDownloadUrl(relativePath) {
 }
 
 function classifyArtifact(name, relativePath) {
+  if (/zephyr\.uf2$|\.uf2$/.test(relativePath)) {
+    return { role: 'uf2-image', dfu: false, uf2: true }
+  }
   if (/zephyr\.signed\.bin$|app_update\.bin$/.test(relativePath)) {
     return { role: 'dfu-image', dfu: true }
   }
@@ -142,7 +145,7 @@ export function listArtifacts(buildDir, buildBase = BUILD_BASE) {
         visit(absolutePath, depth + 1)
         continue
       }
-      if (!/\.(?:hex|bin|elf)$/.test(name)) continue
+      if (!/\.(?:hex|bin|elf|uf2)$/.test(name)) continue
       const relativePath = relative(buildBase, absolutePath)
       const classification = classifyArtifact(name, relativePath)
       artifacts.push({

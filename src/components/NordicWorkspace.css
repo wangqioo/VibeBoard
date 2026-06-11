@@ -47,6 +47,7 @@
 .nordic-status,
 .nordic-command-box,
 .nordic-build-panel,
+.nordic-uf2-panel,
 .nordic-dfu-panel,
 .nordic-capability-list {
   border: 1px solid var(--border);
@@ -104,6 +105,11 @@
 
 .nordic-build-panel {
   display: block;
+}
+
+.nordic-uf2-panel {
+  display: grid;
+  gap: 8px;
 }
 
 .nordic-dfu-panel {

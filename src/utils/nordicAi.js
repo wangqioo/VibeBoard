@@ -15,6 +15,7 @@ const REQUIRED_DFU_CONFIG = [
   'CONFIG_BASE64=y',
   'CONFIG_CRC=y',
   'CONFIG_ZCBOR=y',
+  'CONFIG_BUILD_OUTPUT_UF2=y',
 ]
 
 export function createNordicAiMessages({ userPrompt, board }) {

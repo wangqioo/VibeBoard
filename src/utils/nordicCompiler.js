@@ -38,6 +38,21 @@ export async function downloadNordicArtifact(artifact) {
   return new Uint8Array(await response.arrayBuffer())
 }
 
+export async function saveNordicArtifact(artifact) {
+  const bytes = await downloadNordicArtifact(artifact)
+  const blob = new Blob([bytes], { type: 'application/octet-stream' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const filename = artifact?.name || 'nordic-artifact.bin'
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+  return { size: bytes.length, name: filename }
+}
+
 export function stripAnsi(value) {
   return String(value || '').replace(/\x1b\[[0-9;:]*[A-Za-z]/g, '')
 }

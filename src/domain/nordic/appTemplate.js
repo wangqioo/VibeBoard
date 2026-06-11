@@ -66,6 +66,7 @@ function createPrjConf(capabilities) {
     'CONFIG_BASE64=y',
     'CONFIG_CRC=y',
     'CONFIG_ZCBOR=y',
+    'CONFIG_BUILD_OUTPUT_UF2=y',
   ]
   if (capabilities.has('ble_peripheral')) {
     lines.push(

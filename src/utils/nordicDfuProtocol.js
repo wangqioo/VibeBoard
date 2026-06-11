@@ -206,6 +206,15 @@ export function selectNordicDfuArtifact(artifacts = []) {
   )
 }
 
+export function selectNordicUf2Artifact(artifacts = []) {
+  const candidates = Array.isArray(artifacts) ? artifacts : []
+  return (
+    candidates.find(artifact => artifact?.uf2 === true && /\.uf2$/.test(artifact.name || artifact.relativePath || '')) ||
+    candidates.find(artifact => /zephyr\.uf2$|\.uf2$/.test(artifact?.name || artifact?.relativePath || '')) ||
+    null
+  )
+}
+
 function encodeCborMapEntries(entries) {
   return concatBytes(encodeCborHeader(5, entries.length), ...entries.flatMap(([key, value]) => [
     encodeText(key),

@@ -22,6 +22,7 @@ const files = {
     'CONFIG_BASE64=y',
     'CONFIG_CRC=y',
     'CONFIG_ZCBOR=y',
+    'CONFIG_BUILD_OUTPUT_UF2=y',
     'CONFIG_GPIO=y',
   ].join('\n'),
   'sysbuild.conf': 'SB_CONFIG_BOOTLOADER_MCUBOOT=y\n',

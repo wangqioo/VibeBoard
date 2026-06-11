@@ -3,9 +3,9 @@ import Editor from '@monaco-editor/react'
 import { NORDIC_BOARD_PROFILE, getNordicBoardProfile, listNordicBoards, listNordicCapabilities } from '../domain/nordic/boardProfile'
 import { createDefaultNordicConfig, createNordicAppFiles, normalizeNordicAppName } from '../domain/nordic/appTemplate'
 import { generateNordicProjectWithAi } from '../utils/nordicAi'
-import { checkNordicCompilerHealth, compileNordicProject, downloadNordicArtifact, summarizeNordicBuildFailure } from '../utils/nordicCompiler'
+import { checkNordicCompilerHealth, compileNordicProject, downloadNordicArtifact, saveNordicArtifact, summarizeNordicBuildFailure } from '../utils/nordicCompiler'
 import { flashNordicOverSerial, nordicDfuUnavailableReason } from '../utils/nordicDfu'
-import { selectNordicDfuArtifact } from '../utils/nordicDfuProtocol'
+import { selectNordicDfuArtifact, selectNordicUf2Artifact } from '../utils/nordicDfuProtocol'
 import './NordicWorkspace.css'
 
 const QUICK_PROMPTS = [
@@ -35,6 +35,7 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
   const selectedBoard = getNordicBoardProfile(config.boardId || config.boardTarget)
   const activeContent = files[activeFile] || ''
   const selectedCaps = new Set(config.capabilities)
+  const uf2Artifact = selectNordicUf2Artifact(buildResult?.artifacts || [])
   const dfuArtifact = selectNordicDfuArtifact(buildResult?.artifacts || [])
   const dfuUnavailable = nordicDfuUnavailableReason()
 
@@ -187,6 +188,16 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
     }
   }
 
+  async function handleUf2Download() {
+    if (!uf2Artifact) return
+    try {
+      const result = await saveNordicArtifact(uf2Artifact)
+      setStatus(`已下载 ${result.name} · ${(result.size / 1024).toFixed(1)} KB`)
+    } catch (error) {
+      setStatus(`UF2 下载失败：${error.message}`)
+    }
+  }
+
   return (
     <div className="nordic-workspace">
       <aside className="nordic-sidebar">
@@ -229,7 +240,7 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
             <div className="nordic-artifacts">
               {buildResult.artifacts.map(artifact => (
                 <code key={artifact.relativePath}>
-                  {artifact.relativePath} · {(artifact.size / 1024).toFixed(1)} KB{artifact.dfu ? ' · DFU' : ''}
+                  {artifact.relativePath} · {(artifact.size / 1024).toFixed(1)} KB{artifact.uf2 ? ' · UF2' : ''}{artifact.dfu ? ' · DFU' : ''}
                 </code>
               ))}
             </div>
@@ -252,8 +263,22 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
             </>
           )}
         </div>
+        <div className="nordic-uf2-panel">
+          <div className="nordic-heading">UF2 下载 / 拖拽烧录</div>
+          <div className="nordic-dfu-meta">
+            {uf2Artifact
+              ? `将下载 ${uf2Artifact.name || uf2Artifact.relativePath}`
+              : '先服务器构建，生成 zephyr.uf2'}
+          </div>
+          <button className="nordic-primary" onClick={handleUf2Download} disabled={!uf2Artifact}>
+            下载 UF2
+          </button>
+          <div className="nordic-dfu-note">
+            XIAO 双击 reset 进入 UF2/U 盘模式后，把 zephyr.uf2 拖进去。这是最适合首次烧录和手动恢复的路径。
+          </div>
+        </div>
         <div className="nordic-dfu-panel">
-          <div className="nordic-heading">Web Serial DFU</div>
+          <div className="nordic-heading">MCUmgr 串口升级 / Web Serial DFU</div>
           <div className="nordic-dfu-meta">
             {dfuArtifact
               ? `将烧录 ${dfuArtifact.name || dfuArtifact.relativePath}`
@@ -271,7 +296,7 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
             <span style={{ width: `${dfuProgress}%` }} />
           </div>
           <div className="nordic-dfu-note">
-            首次仍需 west flash 预烧 MCUboot；之后可用浏览器上传 zephyr.signed.bin。
+            需要板子当前固件已经启用 MCUboot + MCUmgr；之后可用浏览器上传 zephyr.signed.bin。
           </div>
           {(dfuUnavailable || dfuLog) && (
             <pre className="nordic-dfu-log">{dfuLog || dfuUnavailable}</pre>

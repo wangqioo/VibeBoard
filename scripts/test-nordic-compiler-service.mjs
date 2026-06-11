@@ -62,6 +62,7 @@ try {
   await import('node:fs').then(({ mkdirSync, writeFileSync }) => {
     mkdirSync(zephyrDir, { recursive: true })
     writeFileSync(join(zephyrDir, 'zephyr.signed.bin'), 'signed')
+    writeFileSync(join(zephyrDir, 'zephyr.uf2'), 'uf2')
     writeFileSync(join(zephyrDir, 'merged.hex'), 'hex')
   })
   const artifacts = listArtifacts(buildDir, artifactsWorkspace)
@@ -70,6 +71,10 @@ try {
   assert.equal(dfuArtifact.dfu, true)
   assert.ok(dfuArtifact.url.includes('/nordic/artifact?path='))
   assert.equal(createArtifactDownloadUrl(dfuArtifact.relativePath), dfuArtifact.url)
+  const uf2Artifact = artifacts.find(artifact => artifact.name === 'zephyr.uf2')
+  assert.equal(uf2Artifact.role, 'uf2-image')
+  assert.equal(uf2Artifact.uf2, true)
+  assert.equal(uf2Artifact.dfu, false)
   assert.equal(artifacts.find(artifact => artifact.name === 'merged.hex').role, 'initial-flash')
 } finally {
   rmSync(artifactsWorkspace, { recursive: true, force: true })
