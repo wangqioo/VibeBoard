@@ -55,6 +55,10 @@ assert.throws(
   () => validateNordicGeneratedFiles({ ...files, 'prj.conf': 'CONFIG_GPIO=y\n' }),
   /missing required DFU config/,
 )
+assert.throws(
+  () => validateNordicGeneratedFiles({ ...files, 'prj.conf': `${files['prj.conf']}\nCONFIG_PRINTK=n\n` }),
+  /must not disable/,
+)
 
 let capturedMessages = null
 const result = await generateNordicProjectWithAi({

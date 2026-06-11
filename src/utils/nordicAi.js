@@ -44,6 +44,7 @@ Rules:
 - Use Zephyr APIs, not Arduino or deprecated nRF5 SDK APIs.
 - Keep MCUboot + MCUmgr serial DFU enabled so browser Web Serial DFU can upload zephyr.signed.bin after first provisioning.
 - prj.conf must include: ${REQUIRED_DFU_CONFIG.join(', ')}.
+- prj.conf must keep CONFIG_PRINTK=y, CONFIG_CONSOLE=y, CONFIG_SERIAL=y, and CONFIG_UART_CONSOLE=y. Do not set them to n in the application image.
 - sysbuild.conf must include SB_CONFIG_BOOTLOADER_MCUBOOT=y.
 - boards/xiao_ble.overlay and sysbuild/mcuboot/boards/xiao_ble.overlay must define matching MCUboot partitions named boot_partition, slot0_partition, slot1_partition, and storage_partition.
 - sysbuild/mcuboot/prj.conf must include CONFIG_FLASH=y, CONFIG_BOOT_MAX_IMG_SECTORS=256, CONFIG_CONSOLE=n, and CONFIG_SERIAL=n.
@@ -108,6 +109,11 @@ export function validateNordicGeneratedFiles(inputFiles) {
   for (const symbol of REQUIRED_DFU_CONFIG) {
     if (!files['prj.conf'].includes(symbol)) {
       throw new Error(`AI 返回的 prj.conf missing required DFU config: ${symbol}`)
+    }
+  }
+  for (const symbol of ['CONFIG_PRINTK', 'CONFIG_CONSOLE', 'CONFIG_SERIAL', 'CONFIG_UART_CONSOLE']) {
+    if (new RegExp(`^${symbol}=n$`, 'm').test(files['prj.conf'])) {
+      throw new Error(`AI 返回的 prj.conf must not disable ${symbol}`)
     }
   }
   if (!files['sysbuild.conf'].includes('SB_CONFIG_BOOTLOADER_MCUBOOT=y')) {

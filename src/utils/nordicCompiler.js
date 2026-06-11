@@ -85,8 +85,9 @@ export function summarizeNordicBuildFailure(log) {
   if (kconfigWarningIndex !== -1 || kconfigAbortIndex !== -1) {
     const warningLine = lines[kconfigWarningIndex] || lines[kconfigAbortIndex]
     const detail = warningLine.replace(/^warning:\s*/i, '')
+    const normalizedDetail = detail.replace(/\s+\(defined at [^)]+\)/, '')
     return {
-      title: `Kconfig 配置不满足：${detail.split("'")[0].trim()}`,
+      title: `Kconfig 配置不满足：${normalizedDetail}`,
       category: 'kconfig',
       file: '',
       line: null,

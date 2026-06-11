@@ -35,7 +35,7 @@ error: Aborting due to Kconfig warnings
 `
 
 assert.deepEqual(summarizeNordicBuildFailure(kconfigLog), {
-  title: 'Kconfig 配置不满足：MCUMGR_GRP_IMG was assigned the value',
+  title: "Kconfig 配置不满足：MCUMGR_GRP_IMG was assigned the value 'y' but got the value 'n'.",
   category: 'kconfig',
   file: '',
   line: null,
@@ -46,6 +46,16 @@ assert.deepEqual(summarizeNordicBuildFailure(kconfigLog), {
     'error: Aborting due to Kconfig warnings',
   ].join('\n'),
 })
+
+const printkKconfigLog = `
+warning: PRINTK (defined at subsys/debug/Kconfig:145) was assigned the value 'y' but got the value 'n'.
+error: Aborting due to Kconfig warnings
+`
+
+assert.equal(
+  summarizeNordicBuildFailure(printkKconfigLog).title,
+  "Kconfig 配置不满足：PRINTK was assigned the value 'y' but got the value 'n'.",
+)
 
 const cmakeLog = `
 CMake Error at /home/wq/ncs/zephyr/cmake/modules/kconfig.cmake:409 (message):
