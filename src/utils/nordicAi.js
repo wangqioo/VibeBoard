@@ -1,6 +1,15 @@
 import { completeChat } from './aiApi.js'
 
-const REQUIRED_FILES = ['CMakeLists.txt', 'prj.conf', 'sysbuild.conf', 'src/main.c', 'README.md']
+const REQUIRED_FILES = [
+  'CMakeLists.txt',
+  'prj.conf',
+  'sysbuild.conf',
+  'sysbuild/mcuboot/prj.conf',
+  'boards/xiao_ble.overlay',
+  'sysbuild/mcuboot/boards/xiao_ble.overlay',
+  'src/main.c',
+  'README.md',
+]
 const REQUIRED_DFU_CONFIG = [
   'CONFIG_BOOTLOADER_MCUBOOT=y',
   'CONFIG_MCUMGR=y',
@@ -25,7 +34,7 @@ export function createNordicAiMessages({ userPrompt, board }) {
     {
       role: 'system',
       content: `You generate complete, buildable nRF Connect SDK / Zephyr projects for VibeBoard.
-Return only JSON with this shape: {"files":{"CMakeLists.txt":"...","prj.conf":"...","sysbuild.conf":"...","src/main.c":"...","README.md":"..."}}.
+Return only JSON with this shape: {"files":{"CMakeLists.txt":"...","prj.conf":"...","sysbuild.conf":"...","sysbuild/mcuboot/prj.conf":"...","boards/xiao_ble.overlay":"...","sysbuild/mcuboot/boards/xiao_ble.overlay":"...","src/main.c":"...","README.md":"..."}}.
 Target board: ${boardName}
 west board target: ${boardTarget}
 
@@ -36,6 +45,8 @@ Rules:
 - Keep MCUboot + MCUmgr serial DFU enabled so browser Web Serial DFU can upload zephyr.signed.bin after first provisioning.
 - prj.conf must include: ${REQUIRED_DFU_CONFIG.join(', ')}.
 - sysbuild.conf must include SB_CONFIG_BOOTLOADER_MCUBOOT=y.
+- boards/xiao_ble.overlay and sysbuild/mcuboot/boards/xiao_ble.overlay must define matching MCUboot partitions named boot_partition, slot0_partition, slot1_partition, and storage_partition.
+- sysbuild/mcuboot/prj.conf must include CONFIG_FLASH=y, CONFIG_BOOT_MAX_IMG_SECTORS=256, CONFIG_CONSOLE=n, and CONFIG_SERIAL=n.
 - src/main.c must call boot_write_img_confirmed() during startup.
 - Avoid board-specific aliases unless you guard them with Zephyr devicetree-safe fallback macros.`,
     },
@@ -101,6 +112,18 @@ export function validateNordicGeneratedFiles(inputFiles) {
   }
   if (!files['sysbuild.conf'].includes('SB_CONFIG_BOOTLOADER_MCUBOOT=y')) {
     throw new Error('AI 返回的 sysbuild.conf 缺少 SB_CONFIG_BOOTLOADER_MCUBOOT=y')
+  }
+  for (const path of ['boards/xiao_ble.overlay', 'sysbuild/mcuboot/boards/xiao_ble.overlay']) {
+    for (const label of ['boot_partition', 'slot0_partition', 'slot1_partition', 'storage_partition']) {
+      if (!files[path].includes(label)) {
+        throw new Error(`AI 返回的 ${path} 缺少 ${label}`)
+      }
+    }
+  }
+  for (const symbol of ['CONFIG_FLASH=y', 'CONFIG_BOOT_MAX_IMG_SECTORS=256', 'CONFIG_CONSOLE=n', 'CONFIG_SERIAL=n']) {
+    if (!files['sysbuild/mcuboot/prj.conf'].includes(symbol)) {
+      throw new Error(`AI 返回的 sysbuild/mcuboot/prj.conf missing required MCUboot config: ${symbol}`)
+    }
   }
   if (!files['src/main.c'].includes('boot_write_img_confirmed')) {
     throw new Error('AI 返回的 src/main.c 必须调用 boot_write_img_confirmed()')

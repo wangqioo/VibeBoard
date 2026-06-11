@@ -26,13 +26,20 @@ export function createNordicAppFiles(config = {}) {
   const board = getNordicBoardProfile(merged.boardId || merged.boardTarget)
   const appName = normalizeNordicAppName(merged.appName || merged.displayName)
   const capabilities = new Set(Array.isArray(merged.capabilities) ? merged.capabilities : [])
-  return {
+  const files = {
     'CMakeLists.txt': createCMakeLists(appName),
     'prj.conf': createPrjConf(capabilities),
     'sysbuild.conf': createSysbuildConf(),
     'src/main.c': createMainC({ ...merged, appName, capabilities, board }),
     'README.md': createReadme({ ...merged, appName, boardTarget: board.boardTarget, boardName: board.name }),
   }
+  if (board.boardTarget.startsWith('xiao_ble')) {
+    const overlay = createXiaoBleMcubootOverlay()
+    files['boards/xiao_ble.overlay'] = overlay
+    files['sysbuild/mcuboot/prj.conf'] = createMcubootPrjConf()
+    files['sysbuild/mcuboot/boards/xiao_ble.overlay'] = overlay
+  }
+  return files
 }
 
 function createCMakeLists(appName) {
@@ -84,6 +91,62 @@ function createPrjConf(capabilities) {
 
 function createSysbuildConf() {
   return `SB_CONFIG_BOOTLOADER_MCUBOOT=y
+`
+}
+
+function createXiaoBleMcubootOverlay() {
+  return `/ {
+    chosen {
+        zephyr,code-partition = &slot0_partition;
+        zephyr,uart-mcumgr = &uart0;
+    };
+};
+
+&flash0 {
+    /delete-node/ partitions;
+
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        boot_partition: partition@0 {
+            label = "mcuboot";
+            reg = <0x00000000 0x0000c000>;
+        };
+
+        slot0_partition: partition@c000 {
+            label = "image-0";
+            reg = <0x0000c000 0x00076000>;
+        };
+
+        slot1_partition: partition@82000 {
+            label = "image-1";
+            reg = <0x00082000 0x00076000>;
+        };
+
+        storage_partition: partition@f8000 {
+            label = "storage";
+            reg = <0x000f8000 0x00008000>;
+        };
+    };
+};
+`
+}
+
+function createMcubootPrjConf() {
+  return `CONFIG_MAIN_STACK_SIZE=10240
+CONFIG_FLASH=y
+CONFIG_BOOT_MAX_IMG_SECTORS=256
+CONFIG_MULTITHREADING=y
+CONFIG_LOG=n
+CONFIG_CONSOLE=n
+CONFIG_CONSOLE_HANDLER=n
+CONFIG_UART_CONSOLE=n
+CONFIG_SERIAL=n
+CONFIG_PRINTK=n
+CONFIG_CBPRINTF_NANO=y
+CONFIG_NCS_APPLICATION_BOOT_BANNER_STRING="MCUboot"
 `
 }
 

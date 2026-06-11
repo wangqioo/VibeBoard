@@ -26,6 +26,14 @@ const files = {
     'CONFIG_GPIO=y',
   ].join('\n'),
   'sysbuild.conf': 'SB_CONFIG_BOOTLOADER_MCUBOOT=y\n',
+  'sysbuild/mcuboot/prj.conf': [
+    'CONFIG_FLASH=y',
+    'CONFIG_BOOT_MAX_IMG_SECTORS=256',
+    'CONFIG_CONSOLE=n',
+    'CONFIG_SERIAL=n',
+  ].join('\n'),
+  'boards/xiao_ble.overlay': 'slot0_partition: partition@c000 {}\nslot1_partition: partition@82000 {}\nboot_partition: partition@0 {}\nstorage_partition: partition@f8000 {}\n',
+  'sysbuild/mcuboot/boards/xiao_ble.overlay': 'slot0_partition: partition@c000 {}\nslot1_partition: partition@82000 {}\nboot_partition: partition@0 {}\nstorage_partition: partition@f8000 {}\n',
   'src/main.c': '#include <zephyr/kernel.h>\n#include <zephyr/dfu/mcuboot.h>\nint main(void) { boot_write_img_confirmed(); return 0; }\n',
   'README.md': '# AI XIAO\n',
 }
