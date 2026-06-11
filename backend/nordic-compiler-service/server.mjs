@@ -1,7 +1,7 @@
 import http from 'node:http'
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 const PORT = Number(process.env.NORDIC_COMPILER_PORT || 8772)
@@ -115,18 +115,29 @@ function runCommand(command, args, options = {}) {
 }
 
 function listArtifacts(buildDir) {
-  const zephyrDir = join(buildDir, 'zephyr')
-  if (!existsSync(zephyrDir)) return []
-  return readdirSync(zephyrDir)
-    .filter(name => /\.(?:hex|bin|elf)$/.test(name))
-    .map(name => {
-      const absolutePath = join(zephyrDir, name)
-      return {
-        name,
-        relativePath: `build/zephyr/${name}`,
-        size: statSync(absolutePath).size,
+  if (!existsSync(buildDir)) return []
+  const artifacts = []
+
+  function visit(dir, depth = 0) {
+    if (depth > 4) return
+    for (const name of readdirSync(dir)) {
+      const absolutePath = join(dir, name)
+      const stats = statSync(absolutePath)
+      if (stats.isDirectory()) {
+        visit(absolutePath, depth + 1)
+        continue
       }
-    })
+      if (!/\.(?:hex|bin|elf)$/.test(name)) continue
+      artifacts.push({
+        name,
+        relativePath: relative(BUILD_BASE, absolutePath),
+        size: stats.size,
+      })
+    }
+  }
+
+  visit(buildDir)
+  return artifacts
 }
 
 async function compileNordicProject({ files, boardTarget }) {
