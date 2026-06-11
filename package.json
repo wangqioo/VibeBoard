@@ -55,6 +55,7 @@
     "test:nordic-app-template": "node scripts/test-nordic-app-template.mjs",
     "test:nordic-workspace-ui": "node scripts/test-nordic-workspace-ui.mjs",
     "test:nordic-build-log-summary": "node scripts/test-nordic-build-log-summary.mjs",
+    "test:nordic-ai-generation": "node scripts/test-nordic-ai-generation.mjs",
     "test:nordic-dfu-protocol": "node scripts/test-nordic-dfu-protocol.mjs",
     "test:nordic-dfu-ui": "node scripts/test-nordic-dfu-ui.mjs",
     "test:nordic-compiler-service": "node scripts/test-nordic-compiler-service.mjs",

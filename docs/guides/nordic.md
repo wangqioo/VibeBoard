@@ -69,9 +69,17 @@ The intended listener is:
 
 ## Generated nRF Project
 
-The generated Nordic project currently targets:
+The generated Nordic project defaults to the user's current board:
 
 ```text
+xiao_ble
+```
+
+Supported board targets in the UI:
+
+```text
+xiao_ble
+xiao_ble/nrf52840/sense
 nrf52840dk/nrf52840
 ```
 
@@ -225,6 +233,11 @@ explicit advertising and scan-response arrays
 - Image test-state command.
 - Reset command.
 - New image boot and self-confirm.
+- Seeed XIAO nRF52840 first provisioning. A timeout like
+  `等待 MCUmgr 响应超时` means the browser opened the serial port but the
+  currently running firmware did not answer MCUmgr/SMP serial packets. The usual
+  fix is to flash the generated `merged.hex` once with a non-browser path, then
+  use browser DFU for later `zephyr.signed.bin` updates.
 
 ## Next Real-Board Test
 

@@ -1,4 +1,4 @@
-import { NORDIC_BOARD_PROFILE } from './boardProfile.js'
+import { NORDIC_BOARD_PROFILE, getNordicBoardProfile } from './boardProfile.js'
 
 export function normalizeNordicAppName(value) {
   const normalized = String(value || '')
@@ -13,8 +13,9 @@ export function normalizeNordicAppName(value) {
 export function createDefaultNordicConfig() {
   return {
     appName: 'vibeboard_nordic_app',
-    displayName: 'Nordic BLE GPIO Demo',
-    description: 'BLE peripheral with GPIO LED heartbeat, button input, UART console logs, and Zephyr-ready project files.',
+    displayName: 'XIAO nRF BLE GPIO Demo',
+    description: 'BLE peripheral with GPIO LED heartbeat, UART console logs, and Zephyr-ready project files for Seeed XIAO nRF52840.',
+    boardId: NORDIC_BOARD_PROFILE.id,
     boardTarget: NORDIC_BOARD_PROFILE.boardTarget,
     capabilities: ['ble_peripheral', 'gpio_led_button', 'uart_console'],
   }
@@ -22,14 +23,15 @@ export function createDefaultNordicConfig() {
 
 export function createNordicAppFiles(config = {}) {
   const merged = { ...createDefaultNordicConfig(), ...config }
+  const board = getNordicBoardProfile(merged.boardId || merged.boardTarget)
   const appName = normalizeNordicAppName(merged.appName || merged.displayName)
   const capabilities = new Set(Array.isArray(merged.capabilities) ? merged.capabilities : [])
   return {
     'CMakeLists.txt': createCMakeLists(appName),
     'prj.conf': createPrjConf(capabilities),
     'sysbuild.conf': createSysbuildConf(),
-    'src/main.c': createMainC({ ...merged, appName, capabilities }),
-    'README.md': createReadme({ ...merged, appName }),
+    'src/main.c': createMainC({ ...merged, appName, capabilities, board }),
+    'README.md': createReadme({ ...merged, appName, boardTarget: board.boardTarget, boardName: board.name }),
   }
 }
 
@@ -84,7 +86,7 @@ function createSysbuildConf() {
 `
 }
 
-function createMainC({ displayName, description, capabilities }) {
+function createMainC({ displayName, description, capabilities, board }) {
   const hasBle = capabilities.has('ble_peripheral')
   const hasGpio = capabilities.has('gpio_led_button')
   const hasUart = capabilities.has('uart_console')
@@ -139,7 +141,7 @@ int main(void)
 
     printk("%s\\n", APP_NAME);
     printk("%s\\n", APP_DESCRIPTION);
-    printk("Board: ${NORDIC_BOARD_PROFILE.boardTarget}\\n");
+    printk("Board: ${board.boardTarget}\\n");
 
 ${hasGpio ? `    if (!gpio_is_ready_dt(&led)) {
         printk("LED GPIO is not ready\\n");
@@ -173,12 +175,12 @@ ${hasGpio ? `        if (led.port && gpio_is_ready_dt(&led)) {
 `
 }
 
-function createReadme({ displayName, description, boardTarget }) {
+function createReadme({ displayName, description, boardTarget, boardName }) {
   return `# ${displayName}
 
 ${description}
 
-Generated for ${NORDIC_BOARD_PROFILE.framework}.
+Generated for ${boardName || NORDIC_BOARD_PROFILE.name} on ${NORDIC_BOARD_PROFILE.framework}.
 
 Build:
 

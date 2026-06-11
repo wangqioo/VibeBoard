@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import { createNordicAppFiles, normalizeNordicAppName } from '../src/domain/nordic/appTemplate.js'
-import { NORDIC_BOARD_PROFILE, listNordicCapabilities } from '../src/domain/nordic/boardProfile.js'
+import { NORDIC_BOARD_PROFILE, listNordicCapabilities, listNordicBoards } from '../src/domain/nordic/boardProfile.js'
 
-assert.equal(NORDIC_BOARD_PROFILE.boardTarget, 'nrf52840dk/nrf52840')
+assert.equal(NORDIC_BOARD_PROFILE.boardTarget, 'xiao_ble')
+assert.ok(listNordicBoards().some(board => board.boardTarget === 'xiao_ble'))
+assert.ok(listNordicBoards().some(board => board.boardTarget === 'xiao_ble/nrf52840/sense'))
+assert.ok(listNordicBoards().some(board => board.boardTarget === 'nrf52840dk/nrf52840'))
 assert.ok(listNordicCapabilities().some(cap => cap.id === 'ble_peripheral'))
 
 assert.equal(normalizeNordicAppName('BLE GPIO Demo!'), 'ble_gpio_demo')
@@ -41,7 +44,7 @@ assert.ok(files['src/main.c'].includes('GPIO_DT_SPEC_GET_OR(LED0_NODE'))
 assert.ok(files['src/main.c'].includes('bt_le_adv_start'))
 assert.ok(files['src/main.c'].includes('BT_LE_ADV_CONN_FAST_1'))
 assert.ok(!files['src/main.c'].includes('BT_LE_ADV_CONN_NAME'))
-assert.ok(files['README.md'].includes('west build -b nrf52840dk/nrf52840 .'))
+assert.ok(files['README.md'].includes('west build -b xiao_ble .'))
 assert.ok(files['README.md'].includes('zephyr.signed.bin'))
 assert.ok(files['README.md'].includes('Web Serial DFU'))
 

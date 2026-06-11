@@ -279,7 +279,12 @@ running MCUboot + MCUmgr.
 
 ### Completed
 
-- Added a Nordic workspace path for nRF52840 DK / `nrf52840dk/nrf52840`.
+- Added a Nordic workspace path. It now defaults to Seeed XIAO nRF52840 /
+  `xiao_ble` and also keeps selectable support for XIAO Sense
+  `xiao_ble/nrf52840/sense` and Nordic nRF52840 DK `nrf52840dk/nrf52840`.
+- Replaced the earlier fake Nordic "AI code" path. The Nordic assistant now calls
+  the configured AI API and validates the returned Zephyr project files before
+  writing them into the editor.
 - Added a standalone nRF compiler service under
   `backend/nordic-compiler-service/server.mjs`.
 - Deployed the nRF compiler service on the home server:

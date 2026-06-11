@@ -23,12 +23,14 @@ assert.throws(() => sanitizeNordicFilePath('/tmp/escape.c'), /Unsafe Nordic file
 assert.throws(() => sanitizeNordicFilePath('west.yml'), /Unsafe Nordic file path/)
 
 assert.equal(normalizeBoardTarget('nrf52840dk/nrf52840'), 'nrf52840dk/nrf52840')
+assert.equal(normalizeBoardTarget('xiao_ble'), 'xiao_ble')
+assert.equal(normalizeBoardTarget('xiao_ble/nrf52840/sense'), 'xiao_ble/nrf52840/sense')
 assert.throws(() => normalizeBoardTarget('nrf52840dk/nrf52840; rm -rf /'), /Unsafe Nordic board target/)
 
 const workspace = mkdtempSync(join(tmpdir(), 'nordic-compiler-service-'))
 try {
   const payload = {
-    boardTarget: 'nrf52840dk/nrf52840',
+    boardTarget: 'xiao_ble',
     files: {
       'CMakeLists.txt': 'cmake_minimum_required(VERSION 3.20.0)\nfind_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})\nproject(test)\ntarget_sources(app PRIVATE src/main.c)\n',
       'prj.conf': 'CONFIG_GPIO=y\n',
@@ -37,7 +39,7 @@ try {
     },
   }
   const project = writeNordicProject({ buildBase: workspace, ...payload })
-  assert.equal(project.boardTarget, 'nrf52840dk/nrf52840')
+  assert.equal(project.boardTarget, 'xiao_ble')
   assert.ok(project.writtenFiles.includes('CMakeLists.txt'))
   assert.ok(project.writtenFiles.includes('prj.conf'))
   assert.ok(project.writtenFiles.includes('sysbuild.conf'))
@@ -77,6 +79,6 @@ const health = healthPayload()
 assert.equal(health.service, 'nordic-compiler')
 assert.equal(health.toolchain, 'nRF Connect SDK + Zephyr')
 assert.equal(health.buildTool, 'west')
-assert.equal(health.defaultBoardTarget, 'nrf52840dk/nrf52840')
+assert.equal(health.defaultBoardTarget, 'xiao_ble')
 
 console.log('nordic compiler service tests passed')

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import Editor from '@monaco-editor/react'
-import { NORDIC_BOARD_PROFILE, listNordicCapabilities } from '../domain/nordic/boardProfile'
+import { NORDIC_BOARD_PROFILE, getNordicBoardProfile, listNordicBoards, listNordicCapabilities } from '../domain/nordic/boardProfile'
 import { createDefaultNordicConfig, createNordicAppFiles, normalizeNordicAppName } from '../domain/nordic/appTemplate'
+import { generateNordicProjectWithAi } from '../utils/nordicAi'
 import { checkNordicCompilerHealth, compileNordicProject, downloadNordicArtifact, summarizeNordicBuildFailure } from '../utils/nordicCompiler'
 import { flashNordicOverSerial, nordicDfuUnavailableReason } from '../utils/nordicDfu'
 import { selectNordicDfuArtifact } from '../utils/nordicDfuProtocol'
@@ -13,12 +14,13 @@ const QUICK_PROMPTS = [
   '做一个 I2C 传感器工程骨架，保留 Zephyr sensor API 接入点。',
 ]
 
-export default function NordicWorkspace({ onOpenSettings }) {
+export default function NordicWorkspace({ settings, onOpenSettings }) {
   const [config, setConfig] = useState(createDefaultNordicConfig)
   const [files, setFiles] = useState(() => createNordicAppFiles(createDefaultNordicConfig()))
   const [activeFile, setActiveFile] = useState('src/main.c')
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useState('nRF Connect SDK 工程已就绪。')
+  const [aiState, setAiState] = useState('idle')
   const [buildState, setBuildState] = useState('idle')
   const [buildResult, setBuildResult] = useState(null)
   const [buildLog, setBuildLog] = useState('')
@@ -28,11 +30,24 @@ export default function NordicWorkspace({ onOpenSettings }) {
   const [dfuState, setDfuState] = useState('idle')
   const [dfuProgress, setDfuProgress] = useState(0)
   const [dfuLog, setDfuLog] = useState('')
+  const boards = useMemo(() => listNordicBoards(), [])
   const capabilities = useMemo(() => listNordicCapabilities(), [])
+  const selectedBoard = getNordicBoardProfile(config.boardId || config.boardTarget)
   const activeContent = files[activeFile] || ''
   const selectedCaps = new Set(config.capabilities)
   const dfuArtifact = selectNordicDfuArtifact(buildResult?.artifacts || [])
   const dfuUnavailable = nordicDfuUnavailableReason()
+
+  function resetBuildAndDfuState() {
+    setBuildResult(null)
+    setBuildLog('')
+    setBuildSummary(null)
+    setShowFullBuildLog(false)
+    setBuildState('idle')
+    setDfuState('idle')
+    setDfuProgress(0)
+    setDfuLog('')
+  }
 
   function updateCapability(id) {
     setConfig(prev => {
@@ -44,26 +59,31 @@ export default function NordicWorkspace({ onOpenSettings }) {
   }
 
   function regenerate(nextConfig = config) {
+    const board = getNordicBoardProfile(nextConfig.boardId || nextConfig.boardTarget)
     const normalized = {
       ...nextConfig,
       appName: normalizeNordicAppName(nextConfig.displayName || nextConfig.appName),
+      boardId: board.id,
+      boardTarget: board.boardTarget,
     }
     const nextFiles = createNordicAppFiles(normalized)
     setConfig(normalized)
     setFiles(nextFiles)
     setActiveFile(nextFiles[activeFile] ? activeFile : 'src/main.c')
-    setBuildResult(null)
-    setBuildLog('')
-    setBuildSummary(null)
-    setShowFullBuildLog(false)
-    setBuildState('idle')
-    setDfuState('idle')
-    setDfuProgress(0)
-    setDfuLog('')
-    setStatus(`已生成 ${normalized.appName}，目标板 ${normalized.boardTarget}`)
+    resetBuildAndDfuState()
+    setStatus(`已生成模板 ${normalized.appName}，目标板 ${normalized.boardTarget}`)
   }
 
-  function applyPrompt() {
+  function handleBoardChange(boardId) {
+    const board = getNordicBoardProfile(boardId)
+    regenerate({
+      ...config,
+      boardId: board.id,
+      boardTarget: board.boardTarget,
+    })
+  }
+
+  async function applyPrompt() {
     const lower = prompt.toLowerCase()
     const nextCaps = new Set(config.capabilities)
     if (/ble|bluetooth|蓝牙/.test(lower)) nextCaps.add('ble_peripheral')
@@ -76,10 +96,32 @@ export default function NordicWorkspace({ onOpenSettings }) {
       description: prompt.trim() || config.description,
       capabilities: [...nextCaps],
     }
-    regenerate(nextConfig)
+    setAiState('generating')
+    setStatus('正在调用 AI 生成 Nordic/Zephyr 工程...')
+    try {
+      const result = await generateNordicProjectWithAi({
+        settings,
+        userPrompt: prompt.trim(),
+        board: selectedBoard,
+      })
+      setConfig({
+        ...nextConfig,
+        appName: normalizeNordicAppName(nextConfig.displayName || nextConfig.appName),
+        boardId: selectedBoard.id,
+        boardTarget: selectedBoard.boardTarget,
+      })
+      setFiles(result.files)
+      setActiveFile(result.files[activeFile] ? activeFile : 'src/main.c')
+      resetBuildAndDfuState()
+      setStatus(`AI 已生成 Nordic 工程，目标板 ${selectedBoard.boardTarget}`)
+    } catch (error) {
+      setStatus(`AI 生成失败：${error.message}`)
+    } finally {
+      setAiState('idle')
+    }
   }
 
-  const westBuild = `west build -b ${config.boardTarget} .`
+  const westBuild = `west build -b ${selectedBoard.boardTarget} .`
 
   async function handleHealthCheck() {
     setBuildState('checking')
@@ -105,7 +147,7 @@ export default function NordicWorkspace({ onOpenSettings }) {
     try {
       const result = await compileNordicProject({
         files,
-        boardTarget: config.boardTarget,
+        boardTarget: selectedBoard.boardTarget,
       })
       setBuildResult(result)
       setBuildLog(result.log || '')
@@ -151,9 +193,17 @@ export default function NordicWorkspace({ onOpenSettings }) {
         <div className="nordic-heading">Nordic</div>
         <div className="nordic-board-card">
           <strong>{NORDIC_BOARD_PROFILE.name}</strong>
-          <span>{NORDIC_BOARD_PROFILE.chip}</span>
-          <code>{NORDIC_BOARD_PROFILE.boardTarget}</code>
+          <span>{selectedBoard.chip}</span>
+          <code>{selectedBoard.boardTarget}</code>
         </div>
+        <label className="nordic-field">
+          <span className="nordic-heading">目标板</span>
+          <select value={selectedBoard.id} onChange={event => handleBoardChange(event.target.value)}>
+            {boards.map(board => (
+              <option key={board.id} value={board.id}>{board.name} · {board.boardTarget}</option>
+            ))}
+          </select>
+        </label>
         <div className="nordic-status">{status}</div>
         <div className="nordic-command-box">
           <div className="nordic-heading">west</div>
@@ -293,7 +343,7 @@ export default function NordicWorkspace({ onOpenSettings }) {
           <button onClick={onOpenSettings}>AI 设置</button>
         </div>
         <div className="nordic-chat-body">
-          <p>描述需求后会生成真实 Zephyr 工程文件，包含 CMake、prj.conf 和 src/main.c。</p>
+          <p>描述需求后会调用已配置模型生成真实 Zephyr 工程文件，包含 CMake、prj.conf 和 src/main.c。</p>
           <p>当前已接入服务器 west build 和浏览器 Web Serial DFU；首次预烧仍使用 west flash。</p>
           <div className="nordic-prompts">
             {QUICK_PROMPTS.map(item => (
@@ -307,7 +357,9 @@ export default function NordicWorkspace({ onOpenSettings }) {
             onChange={event => setPrompt(event.target.value)}
             placeholder="描述你想要的 nRF 功能..."
           />
-          <button className="nordic-primary" onClick={applyPrompt} disabled={!prompt.trim()}>生成代码</button>
+          <button className="nordic-primary" onClick={applyPrompt} disabled={aiState === 'generating' || !prompt.trim()}>
+            {aiState === 'generating' ? 'AI 生成中...' : 'AI 生成代码'}
+          </button>
         </div>
       </aside>
     </div>

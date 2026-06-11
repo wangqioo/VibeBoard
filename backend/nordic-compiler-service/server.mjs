@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 const PORT = Number(process.env.NORDIC_COMPILER_PORT || 8772)
 const BUILD_BASE = process.env.NORDIC_BUILD_BASE || '/tmp/nordic-builds'
 const SELF_TEST_MODE = process.env.NORDIC_SELF_TEST_MODE === '1'
-const DEFAULT_BOARD_TARGET = 'nrf52840dk/nrf52840'
+const DEFAULT_BOARD_TARGET = 'xiao_ble'
 const MAX_BODY_BYTES = 2 * 1024 * 1024
 const MAX_FILE_BYTES = 512 * 1024
 
