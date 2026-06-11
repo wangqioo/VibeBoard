@@ -8,7 +8,15 @@ import {
   updateManifestSliderValue,
 } from '../domain/digitalTwin/interactiveManifest'
 import { DIGITAL_TWIN_MANIFEST_KEY } from '../domain/digitalTwin/uiManifest'
-import { createPreviewRequest, PREVIEW_STATUS, previewDataUrl, renderLvglPreview, stablePreviewFingerprint } from '../utils/preview'
+import {
+  checkLvglPreviewStatus,
+  createPreviewFidelityState,
+  createPreviewRequest,
+  PREVIEW_STATUS,
+  previewDataUrl,
+  renderLvglPreview,
+  stablePreviewFingerprint,
+} from '../utils/preview'
 import './DigitalTwinPreview.css'
 
 const SCENE_LABELS = {
@@ -430,8 +438,32 @@ export default function DigitalTwinPreview({ files, selectedSkills = [], board, 
   const [logs, setLogs] = useState(['digital twin ready'])
   const [lvglPreview, setLvglPreview] = useState(null)
   const [lvglPreviewState, setLvglPreviewState] = useState(PREVIEW_STATUS.IDLE)
+  const [lvglServiceStatus, setLvglServiceStatus] = useState(null)
   const [lvglInteraction, setLvglInteraction] = useState(null)
   const capabilities = capabilityItems(analysis.capabilities)
+  const hasSemanticPreview = Boolean(uiManifest || analysis.hasSource || analysis.scene !== DIGITAL_TWIN_SCENES.EMPTY)
+  const previewFidelity = useMemo(() => createPreviewFidelityState({
+    hasSemanticPreview,
+    canRenderLvgl,
+    serviceStatus: lvglServiceStatus,
+    lvglPreview,
+    lvglPreviewState,
+  }), [canRenderLvgl, hasSemanticPreview, lvglPreview, lvglPreviewState, lvglServiceStatus])
+
+  useEffect(() => {
+    let cancelled = false
+    checkLvglPreviewStatus()
+      .then(status => {
+        if (!cancelled) setLvglServiceStatus(status)
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setLvglServiceStatus({ realPreviewReady: false, error: err.message })
+          setLogs(logs => addLog(logs, `LVGL service status unavailable: ${err.message}`))
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!onPreviewContextChange) return
@@ -442,6 +474,7 @@ export default function DigitalTwinPreview({ files, selectedSkills = [], board, 
       hasSource: analysis.hasSource,
       canRenderLvgl,
       previewState: lvglPreviewState,
+      previewFidelity,
       preview: lvglPreview ? {
         status: lvglPreview.status,
         renderer: lvglPreview.renderer,
@@ -469,6 +502,7 @@ export default function DigitalTwinPreview({ files, selectedSkills = [], board, 
     lvglPreview,
     lvglPreviewState,
     onPreviewContextChange,
+    previewFidelity,
     selectedSkills,
     uiManifest,
   ])
@@ -608,6 +642,15 @@ export default function DigitalTwinPreview({ files, selectedSkills = [], board, 
               <span key={item.key} className={`dt-cap ${item.active ? 'active' : ''}`}>{item.label}</span>
             ))}
             {canRenderLvgl && <span className="dt-cap active">LVGL Touch</span>}
+          </div>
+          <div className="dt-fidelity" aria-label="Preview fidelity">
+            {previewFidelity.map(item => (
+              <div className={`dt-fidelity-item ${item.state}`} key={item.id}>
+                <span className="dt-fidelity-dot" />
+                <span className="dt-fidelity-label">{item.label}</span>
+                <span className="dt-fidelity-detail">{item.detail}</span>
+              </div>
+            ))}
           </div>
           <div className="dt-log">
             {logs.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)}

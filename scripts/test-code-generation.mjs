@@ -285,12 +285,39 @@ assert.match(generatedAgainstManifest.errors.join(','), /main\/extra\.c:not-in-m
 const repairMessages = buildBuildRepairMessages({
   board,
   selectedSkills: ['lvgl'],
+  manifest: manifest.manifest,
+  activeFile: 'main/app_ui.c',
+  driverContracts: [
+    {
+      id: 'display.lvgl-ui',
+      label: 'LVGL display UI',
+      skillId: 'lvgl',
+      requiredInit: ['bsp_i2c_init', 'pca9557_init', 'bsp_lvgl_start'],
+      allowedApis: ['bsp_lvgl_start', 'lv_scr_act'],
+      forbiddenApis: ['lcd_draw_bitmap'],
+      acceptanceChecks: ['LCD shows repaired UI'],
+      commonFailures: ['calling LVGL before bsp_lvgl_start'],
+    },
+  ],
+  recentDeviceEvidence: {
+    source: 'serial',
+    observations: ['boot log reached app_main', 'screen stayed black after LVGL init'],
+  },
   buildEvidence: { firstError: { file: 'main/main.c', message: 'missing header' } },
   buildLog: ['main/main.c:12:10: fatal error: helper.h: No such file or directory'],
   projectFiles: { 'main/main.c': '#include "helper.h"\nvoid app_main(void) {}' },
 })
 assert.match(repairMessages[0].content, /Patch Application Source only/)
 assert.match(repairMessages[0].content, /Do not generate CMakeLists\.txt/)
+assert.match(repairMessages[1].content, /Program Manifest/)
+assert.match(repairMessages[1].content, /hello_display/)
+assert.match(repairMessages[1].content, /Active file/)
+assert.match(repairMessages[1].content, /main\/app_ui\.c/)
+assert.match(repairMessages[1].content, /Driver Contracts/)
+assert.match(repairMessages[1].content, /display\.lvgl-ui/)
+assert.match(repairMessages[1].content, /bsp_lvgl_start/)
+assert.match(repairMessages[1].content, /Recent Device Evidence/)
+assert.match(repairMessages[1].content, /screen stayed black/)
 assert.match(repairMessages[1].content, /Build Evidence/)
 assert.match(repairMessages[1].content, /helper\.h/)
 

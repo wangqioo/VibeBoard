@@ -10,6 +10,7 @@ import {
   USB_LOG_RELEASE_REQUEST_EVENT,
   USB_LOG_RELEASED_EVENT,
 } from '../utils/usbFlash'
+import { createDeviceEvidence } from '../domain/evidence/deviceEvidence'
 import './LogPanel.css'
 
 const MAX_LINES = 1000
@@ -32,7 +33,7 @@ function copyTextFallback(text) {
   if (!ok) throw new Error('copy failed')
 }
 
-export default function LogPanel({ onAnalyze }) {
+export default function LogPanel({ onAnalyze, onDeviceEvidence }) {
   const [lines,      setLines]      = useState([])
   const [filter,     setFilter]     = useState('')    // level filter E/W/I/D/V/all
   const [search,     setSearch]     = useState('')
@@ -68,9 +69,16 @@ export default function LogPanel({ onAnalyze }) {
     const parsed = parseLine(raw.trimEnd())
     setLines(prev => {
       const next = [...prev, { ...parsed, src, id: Date.now() + Math.random() }]
-      return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next
+      const trimmed = next.length > MAX_LINES ? next.slice(-MAX_LINES) : next
+      const deviceEvidence = createDeviceEvidence({
+        source: src,
+        status: 'observed',
+        lines: trimmed.map(line => line.raw),
+      })
+      onDeviceEvidence?.(deviceEvidence)
+      return trimmed
     })
-  }, [])
+  }, [onDeviceEvidence])
 
   useEffect(() => { sourceRef.current = source }, [source])
   useEffect(() => { statusRef.current = connStatus }, [connStatus])
@@ -270,7 +278,15 @@ export default function LogPanel({ onAnalyze }) {
           <button className="icon-btn" onClick={() => setLines([])} title="清空日志">🗑</button>
           {onAnalyze && lines.length > 0 && (
             <button className="icon-btn analyze-btn"
-              onClick={() => onAnalyze(lines.map(l => l.raw).join('\n'))}
+              onClick={() => {
+                const deviceEvidence = createDeviceEvidence({
+                  source,
+                  status: connStatus === 'error' ? 'failure' : 'observed',
+                  lines: lines.map(l => l.raw),
+                })
+                onDeviceEvidence?.(deviceEvidence)
+                onAnalyze(lines.map(l => l.raw).join('\n'), deviceEvidence)
+              }}
               title="AI 分析日志">
               ✨
             </button>

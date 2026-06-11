@@ -27,13 +27,26 @@ const HUANGSHAN_CAPABILITY_OPTIONS = [
   { value: 'magnetometer', label: '磁力计' },
   { value: 'adc_gpio', label: 'ADC' },
   { value: 'battery', label: '电池' },
+  { value: 'charger', label: '充电' },
+  { value: 'tf_card', label: 'TF 卡' },
+  { value: 'usb_fs', label: 'USB FS' },
+  { value: 'audio_pdm', label: 'PDM' },
+  { value: 'audio_i2s', label: 'I2S' },
+  { value: 'audio_audprc', label: 'AUDPRC' },
   { value: 'bluetooth', label: 'BLE' },
+  { value: 'low_power', label: '低功耗' },
   { value: 'key', label: '按键' },
   { value: 'led', label: 'LED' },
   { value: 'gpio_output', label: 'GPIO' },
   { value: 'uart2', label: 'UART2' },
   { value: 'motor', label: '马达' },
 ]
+
+function componentImplementationLabel(implementation) {
+  if (implementation === 'real') return '真实'
+  if (implementation === 'placeholder') return '占位'
+  return '仅界面'
+}
 
 export default function HuangshanWorkspace({ settings, onOpenSettings }) {
   const [appDisplayName, setAppDisplayName] = useState('传感器仪表盘')
@@ -185,10 +198,12 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
 
   function updateBuilderComponent(componentId, patch) {
     setBuilderConfig(prev => ({
-      ...prev,
-      components: prev.components.map(component => (
+      ...normalizeHuangshanBuilderConfig({
+        ...prev,
+        components: prev.components.map(component => (
         component.id === componentId ? { ...component, ...patch } : component
-      )),
+        )),
+      }),
     }))
     setRealPreview(null)
   }
@@ -545,6 +560,9 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
                         />
                         <span>{component.type}</span>
                       </label>
+                      <span className={`huangshan-component-truth ${component.implementation}`}>
+                        {componentImplementationLabel(component.implementation)}
+                      </span>
                       <input
                         value={component.label}
                         onChange={event => updateBuilderComponent(component.id, { label: event.target.value })}
@@ -695,10 +713,10 @@ function truthBadge(item) {
 function createDraftMessage(config) {
   const components = Array.isArray(config.components) ? config.components.filter(component => component.enabled !== false) : []
   const real = components
-    .filter(component => !['bluetooth', 'motor', 'status'].includes(component.capability))
+    .filter(component => !['motor', 'status'].includes(component.capability))
     .map(component => `${component.label}(${component.capability})`)
   const placeholders = components
-    .filter(component => ['bluetooth', 'motor'].includes(component.capability))
+    .filter(component => ['motor'].includes(component.capability))
     .map(component => `${component.label}(${component.capability})`)
 
   return [

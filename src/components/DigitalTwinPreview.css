@@ -723,6 +723,58 @@
   background: rgba(46, 160, 67, 0.12);
 }
 
+.dt-fidelity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dt-fidelity-item {
+  min-height: 20px;
+  display: grid;
+  grid-template-columns: 8px minmax(58px, auto) 1fr;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.dt-fidelity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8b949e;
+}
+
+.dt-fidelity-label {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.dt-fidelity-detail {
+  min-width: 0;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dt-fidelity-item.available .dt-fidelity-dot {
+  background: #3fb950;
+}
+
+.dt-fidelity-item.pending .dt-fidelity-dot,
+.dt-fidelity-item.degraded .dt-fidelity-dot {
+  background: #d29922;
+}
+
+.dt-fidelity-item.unavailable .dt-fidelity-dot {
+  background: #f85149;
+}
+
 .dt-log {
   flex: 1;
   min-height: 0;

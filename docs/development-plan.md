@@ -124,6 +124,7 @@ requests instead of free-form chat.
 ### Acceptance
 
 - `npm run test:build-evidence`
+- `npm run test:device-evidence`
 - `npm run test:hardware-workflow`
 - `npm run test:workflow-compiler-adapter`
 - A broken generated app can be repaired at least once from structured compiler

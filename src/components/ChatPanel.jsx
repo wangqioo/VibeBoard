@@ -172,6 +172,8 @@ export default function ChatPanel({
   projectFiles = {},
   latestManifest = null,
   previewContext = null,
+  recentDeviceEvidence = null,
+  acceptanceState = null,
   activeFile = '',
 }) {
   const [messages, setMessages] = useState([])
@@ -571,10 +573,14 @@ export default function ChatPanel({
               buildLog: latestCompileLog,
               errorLog: error,
               projectFiles: files,
+              manifest,
+              activeFile,
+              recentDeviceEvidence,
             }),
             {
               buildEvidence,
               repairContext: buildEvidence?.repairContext || null,
+              recentDeviceEvidence,
               source: 'generation-auto-compile',
             },
           )
@@ -670,10 +676,14 @@ export default function ChatPanel({
           buildLog: request.buildLog,
           errorLog: request.errorLog,
           projectFiles: request.projectFiles,
+          manifest: request.manifest || latestManifest,
+          activeFile: request.activeFile || activeFile,
+          recentDeviceEvidence: request.recentDeviceEvidence || recentDeviceEvidence,
         }),
         {
           buildEvidence: request.buildEvidence,
           repairContext: request.buildEvidence?.repairContext || null,
+          recentDeviceEvidence: request.recentDeviceEvidence || recentDeviceEvidence,
         }
       )
       const parsed = parseGeneratedFilesResponseWithOptions(content, board, {
@@ -885,6 +895,31 @@ export default function ChatPanel({
     )
   }
 
+  function AcceptanceStrip({ acceptanceState = null }) {
+    if (!acceptanceState) return null
+    const statusLabel = {
+      passes: '验收通过',
+      'needs-observation': '等待观察',
+      failed: '验收失败',
+    }[acceptanceState.status] || '等待观察'
+    return (
+      <div className={`acceptance-strip ${acceptanceState.status}`}>
+        <div className="acceptance-summary">
+          <span className="acceptance-title">Acceptance</span>
+          <span>{statusLabel}</span>
+          <span className="acceptance-note">{acceptanceState.summary}</span>
+        </div>
+        {acceptanceState.checks?.length > 0 && (
+          <div className="acceptance-checks">
+            {acceptanceState.checks.map(check => (
+              <span key={check.text} className={`acceptance-check ${check.status}`}>{check.text}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="chat-panel">
       <div className="chat-header">
@@ -920,6 +955,7 @@ export default function ChatPanel({
       </div>
 
       <WorkflowStrip workflow={generationWorkflow} />
+      <AcceptanceStrip acceptanceState={acceptanceState} />
 
       <div className="chat-messages">
         {messages.length === 0 && (

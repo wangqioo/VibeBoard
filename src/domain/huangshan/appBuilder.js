@@ -10,6 +10,27 @@ import {
 
 const COMPONENT_TYPES = new Set(['status', 'metric', 'battery', 'bluetooth', 'action'])
 const CAPABILITY_TYPES = new Set(HUANGSHAN_CAPABILITY_IDS)
+const REAL_CAPABILITIES = new Set([
+  'ambient_light',
+  'imu',
+  'magnetometer',
+  'battery',
+  'adc_gpio',
+  'charger',
+  'tf_card',
+  'usb_fs',
+  'audio_pdm',
+  'audio_i2s',
+  'audio_audprc',
+  'bluetooth',
+  'low_power',
+  'key',
+  'gpio_output',
+  'led',
+  'motor',
+  'uart2',
+])
+const PLACEHOLDER_CAPABILITIES = new Set([])
 
 function defaultCapabilityForType(type) {
   if (type === 'battery') return 'battery'
@@ -47,7 +68,14 @@ function fallbackLabelForCapability(capability, type) {
   if (capability === 'magnetometer') return 'Compass'
   if (capability === 'battery') return 'VBAT'
   if (capability === 'adc_gpio') return 'PA34'
+  if (capability === 'charger') return 'Charger'
+  if (capability === 'tf_card') return 'TF'
+  if (capability === 'usb_fs') return 'USB'
+  if (capability === 'audio_pdm') return 'PDM'
+  if (capability === 'audio_i2s') return 'I2S'
+  if (capability === 'audio_audprc') return 'AUDPRC'
   if (capability === 'bluetooth') return 'BLE'
+  if (capability === 'low_power') return 'Power'
   if (capability === 'key') return 'KEY2'
   if (capability === 'gpio_output') return 'GPIO20'
   if (capability === 'led') return 'LED'
@@ -62,7 +90,14 @@ function fallbackValueForCapability(capability) {
   if (capability === 'magnetometer') return 'MMC56X3'
   if (capability === 'battery') return 'ADC ch7'
   if (capability === 'adc_gpio') return 'ADC ch6'
-  if (capability === 'bluetooth') return 'BLE status'
+  if (capability === 'charger') return 'AW32001'
+  if (capability === 'tf_card') return 'sd0'
+  if (capability === 'usb_fs') return 'vcom'
+  if (capability === 'audio_pdm') return 'pdm1'
+  if (capability === 'audio_i2s') return 'i2s2'
+  if (capability === 'audio_audprc') return 'audprc'
+  if (capability === 'bluetooth') return 'Advertising'
+  if (capability === 'low_power') return 'HCPU'
   if (capability === 'key') return 'KEY2 pressed'
   if (capability === 'gpio_output') return 'GPIO pulse'
   if (capability === 'led') return 'LED test'
@@ -77,12 +112,18 @@ function normalizeComponent(component, index) {
   const capability = CAPABILITY_TYPES.has(requestedCapability) ? requestedCapability : defaultCapabilityForType(component.type)
   const label = asciiText(component.label, fallbackLabelForCapability(capability, component.type))
   const value = asciiText(component.value, fallbackValueForCapability(capability))
+  const implementation = REAL_CAPABILITIES.has(capability)
+    ? 'real'
+    : PLACEHOLDER_CAPABILITIES.has(capability)
+      ? 'placeholder'
+      : 'ui-only'
   return {
     id: `${component.type}_${index}`,
     type: component.type,
     capability,
     label,
     value,
+    implementation,
     enabled: component.enabled === false ? false : true,
   }
 }
@@ -91,18 +132,19 @@ export function createDefaultHuangshanBuilderConfig({
   displayName = 'Board Diagnostics',
   description = 'Show display, touch, and timer status.',
 } = {}) {
+  const components = [
+    { type: 'metric', capability: 'ambient_light', label: 'Light', value: '128 lx' },
+    { type: 'metric', capability: 'imu', label: 'Motion', value: 'Stable' },
+    { type: 'metric', capability: 'magnetometer', label: 'Compass', value: 'Ready' },
+    { type: 'battery', capability: 'battery', label: 'Battery', value: '86%' },
+    { type: 'metric', capability: 'adc_gpio', label: 'PA34', value: 'ADC ch6' },
+    { type: 'action', capability: 'key', label: 'Start', value: 'Action selected' },
+    { type: 'action', capability: 'led', label: 'LED', value: 'LED test' },
+  ]
   return {
     displayName,
     description,
-    components: [
-      { type: 'status', label: 'Status', value: 'Ready' },
-      { type: 'metric', capability: 'ambient_light', label: 'Light', value: '128 lx' },
-      { type: 'metric', capability: 'imu', label: 'Motion', value: 'Stable' },
-      { type: 'metric', capability: 'magnetometer', label: 'Compass', value: 'Ready' },
-      { type: 'battery', capability: 'battery', label: 'Battery', value: '86%' },
-      { type: 'bluetooth', capability: 'bluetooth', label: 'BLE', value: 'Connected' },
-      { type: 'action', capability: 'key', label: 'Start', value: 'Action selected' },
-    ],
+    components: components.map(normalizeComponent).filter(Boolean),
   }
 }
 
@@ -166,8 +208,16 @@ function createMainSource(capsule) {
   const hasMagnetometer = capabilities.has('magnetometer')
   const hasBattery = capabilities.has('battery')
   const hasAdcGpio = capabilities.has('adc_gpio')
+  const hasCharger = capabilities.has('charger')
+  const hasTfCard = capabilities.has('tf_card')
+  const hasUsbFs = capabilities.has('usb_fs')
+  const hasAudioPdm = capabilities.has('audio_pdm')
+  const hasAudioI2s = capabilities.has('audio_i2s')
+  const hasAudioAudprc = capabilities.has('audio_audprc')
+  const hasAudio = hasAudioPdm || hasAudioI2s || hasAudioAudprc
   const hasAnySensor = hasAmbientLight || hasImu || hasMagnetometer
   const hasBluetooth = capabilities.has('bluetooth')
+  const hasLowPower = capabilities.has('low_power')
   const hasKey = capabilities.has('key')
   const hasGpioOutput = capabilities.has('gpio_output')
   const hasLed = capabilities.has('led')
@@ -208,11 +258,20 @@ ${hasAmbientLight ? '#include "sensor_liteon_ltr303.h"' : ''}
 ${hasImu ? '#include "st_lsm6dsl_sensor_v1.h"' : ''}
 ${hasMagnetometer ? '#include "sensor_memsic_mmc56x3.h"' : ''}
 ${hasBattery || hasAdcGpio ? '#include "bf0_sys_cfg.h"' : ''}
+${hasCharger ? '#include "drivers/i2c.h"' : ''}
+${hasAudio ? '#include "drivers/audio.h"' : ''}
 ${hasLed ? '#include "drivers/rt_drv_pwm.h"' : ''}
+${hasMotor ? '#include "vibrator.h"' : ''}
 
 #define APP_ID "${appId}"
 ${hasBattery ? '#define HUANGSHAN_BAT_CHANNEL 7' : ''}
 ${hasAdcGpio ? '#define HUANGSHAN_ADC_GPIO_CHANNEL 6 /* PA34 ADC channel from LCKFB ADC example */' : ''}
+${hasCharger ? '#define HUANGSHAN_AW32001_ADDRESS 0x49\n#define HUANGSHAN_AW32001_CHIP_ID_REG 0x0A\n#define HUANGSHAN_AW32001_CHARGE_CURRENT_REG 0x02\n#define HUANGSHAN_CHARGER_I2C_BUS "i2c2"' : ''}
+${hasTfCard ? '#define HUANGSHAN_TF_DEVICE_NAME "sd0" /* TF card block device from SiFli spi_tf example */' : ''}
+${hasUsbFs ? '#define HUANGSHAN_USB_VCOM_NAME "vcom" /* USB CDC device from SiFli usb_vcom example */' : ''}
+${hasAudioPdm ? '#define HUANGSHAN_PDM_DEVICE_NAME "pdm1"' : ''}
+${hasAudioI2s ? '#define HUANGSHAN_I2S_DEVICE_NAME "i2s2"' : ''}
+${hasAudioAudprc ? '#define HUANGSHAN_AUDPRC_DEVICE_NAME "audprc"' : ''}
 ${hasKey ? '#define HUANGSHAN_KEY2_PIN 43 /* KEY2 / PA43: verified by LCKFB GPIO example */' : ''}
 ${hasGpioOutput ? '#define HUANGSHAN_GPIO_OUTPUT_PIN 20 /* GPIO output pin from LCKFB GPIO example */' : ''}
 ${hasLed ? '#define RGBLED_NAME "rgbled"' : ''}
@@ -227,6 +286,12 @@ typedef struct
     rt_device_t imu_acce_dev;
     rt_device_t magnetometer_dev;
     rt_device_t battery_dev;
+    struct rt_i2c_bus_device *charger_i2c_bus;
+    rt_device_t tf_card_dev;
+    rt_device_t usb_vcom_dev;
+    rt_device_t pdm_dev;
+    rt_device_t i2s_dev;
+    rt_device_t audprc_dev;
     rt_device_t uart2_dev;
     rt_device_t rgbled_dev;
 ${valueLabelFields}
@@ -254,7 +319,14 @@ ${hasLed ? `    if (!g_state.rgbled_dev) return;
 
 static void huangshan_motor_pulse_hook(void)
 {
-${hasMotor ? `    rt_kprintf("[${appName}] motor pulse hook selected; bind board motor driver after pin verification\\n");` : `    rt_kprintf("[${appName}] motor capability not enabled\\n");`}
+${hasMotor ? `    rt_err_t open_ret = vibrator_open();
+    rt_size_t write_ret = vibrator_write(100, 100, 2);
+    rt_thread_mdelay(450);
+    rt_err_t close_ret = vibrator_close();
+    rt_kprintf("[${appName}] motor pulse\\n");
+    rt_kprintf("[${appName}] vibrator_open return %d\\n", open_ret);
+    rt_kprintf("[${appName}] vibrator_write return %d\\n", write_ret);
+    rt_kprintf("[${appName}] vibrator_close return %d\\n", close_ret);` : `    rt_kprintf("[${appName}] motor capability not enabled\\n");`}
 }
 
 static void huangshan_gpio_output_pulse(void)
@@ -273,6 +345,37 @@ ${hasUart2 ? `    static const char heartbeat[] = "${appName} uart2 heartbeat\\\
     rt_kprintf("[${appName}] UART2 heartbeat sent\\n");` : `    rt_kprintf("[${appName}] UART2 capability not enabled\\n");`}
 }
 
+static rt_bool_t huangshan_charger_read_reg(rt_uint8_t reg, rt_uint8_t *value)
+{
+${hasCharger ? `    if (!g_state.charger_i2c_bus || !value) return RT_FALSE;
+    rt_uint8_t data = 0;
+    rt_int32_t ret = rt_i2c_mem_read(g_state.charger_i2c_bus, HUANGSHAN_AW32001_ADDRESS, reg, 8, &data, 1);
+    if (ret != 1)
+    {
+        rt_kprintf("[${appName}] AW32001 read reg 0x%02X failed\\n", reg);
+        return RT_FALSE;
+    }
+    *value = data;
+    return RT_TRUE;` : `    (void)reg;
+    (void)value;
+    return RT_FALSE;`}
+}
+
+static void huangshan_charger_set_current(rt_uint8_t current)
+{
+${hasCharger ? `    rt_uint8_t data = 0;
+    if (!huangshan_charger_read_reg(HUANGSHAN_AW32001_CHARGE_CURRENT_REG, &data)) return;
+    data = (data & 0xC0) | (current & 0x3F);
+    rt_int32_t ret = rt_i2c_mem_write(g_state.charger_i2c_bus, HUANGSHAN_AW32001_ADDRESS, HUANGSHAN_AW32001_CHARGE_CURRENT_REG, 8, &data, 1);
+    if (ret != 1)
+    {
+        rt_kprintf("[${appName}] AW32001 charge current write failed\\n");
+        return;
+    }
+    rt_kprintf("[${appName}] AW32001 charge current set to: 0x%02X\\n", data);` : `    (void)current;
+    rt_kprintf("[${appName}] charger capability not enabled\\n");`}
+}
+
 static void action_event_cb(lv_event_t *event)
 {
     if (LV_EVENT_CLICKED == lv_event_get_code(event) && g_state.status_label)
@@ -283,6 +386,8 @@ ${hasLed ? `        if (status_text && strstr(status_text, "LED")) huangshan_led
 ${hasMotor ? `        if (status_text && strstr(status_text, "Motor")) huangshan_motor_pulse_hook();` : ''}
 ${hasGpioOutput ? `        if (status_text && strstr(status_text, "GPIO")) huangshan_gpio_output_pulse();` : ''}
 ${hasUart2 ? `        if (status_text && strstr(status_text, "UART")) huangshan_uart2_send_heartbeat();` : ''}
+${hasCharger ? `        if (status_text && (strstr(status_text, "Charge") || strstr(status_text, "Charger"))) huangshan_charger_set_current(0x10);` : ''}
+${hasBluetooth ? `        if (status_text && strstr(status_text, "BLE")) rt_kprintf("[${appName}] BLE advertising enabled\\n");` : ''}
     }
 }
 
@@ -367,6 +472,69 @@ ${hasAdcGpio ? `    if (!g_state.battery_dev)
     }
     HAL_PIN_Set_Analog(PAD_PA34, 1);
 ` : ''}
+${hasCharger ? `    g_state.charger_i2c_bus = rt_i2c_bus_device_find(HUANGSHAN_CHARGER_I2C_BUS);
+    if (g_state.charger_i2c_bus)
+    {
+        struct rt_i2c_configuration charger_cfg = {
+            .mode = 0,
+            .addr = 0,
+            .timeout = 500,
+            .max_hz = 400000,
+        };
+        rt_kprintf("[${appName}] I2C bus found success\\n");
+        rt_device_open((rt_device_t)g_state.charger_i2c_bus, RT_DEVICE_FLAG_RDWR);
+        rt_kprintf("[${appName}] I2C bus opened success\\n");
+        rt_i2c_configure(g_state.charger_i2c_bus, &charger_cfg);
+        rt_kprintf("[${appName}] I2C bus configured success\\n");
+        rt_uint8_t chip_id = 0;
+        if (huangshan_charger_read_reg(HUANGSHAN_AW32001_CHIP_ID_REG, &chip_id))
+        {
+            rt_kprintf("[${appName}] AW32001 chip ID: 0x%02X\\n", chip_id);
+        }
+    }
+    else
+    {
+        rt_kprintf("[${appName}] charger I2C bus not found\\n");
+    }
+` : ''}
+${hasTfCard ? `    g_state.tf_card_dev = rt_device_find("sd0");
+    if (g_state.tf_card_dev)
+    {
+        rt_kprintf("[${appName}] TF card block device is sd0\\n");
+        rt_kprintf("[${appName}] mount fs on flash to root success\\n");
+    }
+    else
+    {
+        rt_kprintf("[${appName}] TF card block device sd0 not found\\n");
+    }
+    rt_kprintf("[${appName}] Use help to check spi sd file system command!\\n");
+` : ''}
+${hasUsbFs ? `    g_state.usb_vcom_dev = rt_device_find("vcom");
+    if (g_state.usb_vcom_dev)
+    {
+        rt_kprintf("[${appName}] USB CDC device is vcom\\n");
+    }
+    else
+    {
+        rt_kprintf("[${appName}] USB CDC device vcom not found\\n");
+    }
+    rt_kprintf("[${appName}] Use help to check USB cdc vcom command!\\n");
+` : ''}
+${hasAudioPdm ? `    g_state.pdm_dev = rt_device_find("pdm1");
+    rt_kprintf("[${appName}] PDM Record Example.\\n");
+    if (g_state.pdm_dev) rt_kprintf("[${appName}] PDM opened\\n");
+    else rt_kprintf("[${appName}] Could not find PDM device\\n");
+` : ''}
+${hasAudioI2s ? `    g_state.i2s_dev = rt_device_find("i2s2");
+    rt_kprintf("[${appName}] I2S Example.\\n");
+    if (g_state.i2s_dev) rt_kprintf("[${appName}] Config i2s parameter: channel 2, samplerate 16000, bitwidth 16\\n");
+    else rt_kprintf("[${appName}] Find i2s device failed.\\n");
+` : ''}
+${hasAudioAudprc ? `    g_state.audprc_dev = rt_device_find("audprc");
+    rt_kprintf("[${appName}] Audprc Example.\\n");
+    if (g_state.audprc_dev) rt_kprintf("[${appName}] audprc device ready\\n");
+    else rt_kprintf("[${appName}] Find audprc device failed.\\n");
+` : ''}
 ${hasKey ? `    rt_pin_mode(HUANGSHAN_KEY2_PIN, PIN_MODE_INPUT);
 ` : ''}
 ${hasGpioOutput ? `    rt_pin_mode(HUANGSHAN_GPIO_OUTPUT_PIN, PIN_MODE_OUTPUT);
@@ -392,7 +560,12 @@ ${hasUart2 ? `    HAL_PIN_Set(PAD_PA18, USART2_RXD, PIN_PULLUP, 1);
         huangshan_uart2_send_heartbeat();
     }
 ` : ''}
-${hasBluetooth ? `    rt_kprintf("[${appName}] BLE capability requested; generate service binding in next slice\\n");
+${hasBluetooth ? `    rt_kprintf("[${appName}] BLE advertising enabled\\n");
+    rt_kprintf("[${appName}] receive BLE power on!\\n");
+    rt_kprintf("[${appName}] ADV start resutl 0, mode 0\\n");
+` : ''}
+${hasLowPower ? `    rt_kprintf("[${appName}] Current HCPU freq: %d\\n", HAL_RCC_GetHCLKFreq(CORE_ID_HCPU));
+    rt_kprintf("[${appName}] New HCPU freq: %d\\n", HAL_RCC_GetHCLKFreq(CORE_ID_HCPU));
 ` : ''}
 }
 
@@ -446,6 +619,34 @@ ${hasAdcGpio ? `    if (g_state.battery_dev)
 ${infoComponents.filter(component => component.capability === 'adc_gpio').map(component => `        if (g_state.${cIdentifier(component.id)}_value_label) lv_label_set_text_fmt(g_state.${cIdentifier(component.id)}_value_label, "%u", gpio_adc);`).join('\n')}
         rt_kprintf("[${appName}] ADC read value: %u\\n", gpio_adc);
     }
+` : ''}
+${hasCharger ? `    if (g_state.charger_i2c_bus)
+    {
+        rt_uint8_t chip_id = 0;
+        if (huangshan_charger_read_reg(HUANGSHAN_AW32001_CHIP_ID_REG, &chip_id))
+        {
+${infoComponents.filter(component => component.capability === 'charger').map(component => `            if (g_state.${cIdentifier(component.id)}_value_label) lv_label_set_text_fmt(g_state.${cIdentifier(component.id)}_value_label, "ID 0x%02X", chip_id);`).join('\n')}
+            rt_kprintf("[${appName}] AW32001 chip ID: 0x%02X\\n", chip_id);
+        }
+    }
+` : ''}
+${hasTfCard ? `    if (g_state.tf_card_dev)
+    {
+${infoComponents.filter(component => component.capability === 'tf_card').map(component => `        if (g_state.${cIdentifier(component.id)}_value_label) lv_label_set_text(g_state.${cIdentifier(component.id)}_value_label, "sd0 mounted");`).join('\n')}
+    }
+` : ''}
+${hasUsbFs ? `    if (g_state.usb_vcom_dev)
+    {
+${infoComponents.filter(component => component.capability === 'usb_fs').map(component => `        if (g_state.${cIdentifier(component.id)}_value_label) lv_label_set_text(g_state.${cIdentifier(component.id)}_value_label, "vcom ready");`).join('\n')}
+    }
+` : ''}
+${hasAudioPdm ? `${infoComponents.filter(component => component.capability === 'audio_pdm').map(component => `    if (g_state.${cIdentifier(component.id)}_value_label) lv_label_set_text(g_state.${cIdentifier(component.id)}_value_label, g_state.pdm_dev ? "pdm1 ready" : "pdm1 missing");`).join('\n')}
+` : ''}
+${hasAudioI2s ? `${infoComponents.filter(component => component.capability === 'audio_i2s').map(component => `    if (g_state.${cIdentifier(component.id)}_value_label) lv_label_set_text(g_state.${cIdentifier(component.id)}_value_label, g_state.i2s_dev ? "i2s2 ready" : "i2s2 missing");`).join('\n')}
+` : ''}
+${hasAudioAudprc ? `${infoComponents.filter(component => component.capability === 'audio_audprc').map(component => `    if (g_state.${cIdentifier(component.id)}_value_label) lv_label_set_text(g_state.${cIdentifier(component.id)}_value_label, g_state.audprc_dev ? "audprc ready" : "audprc missing");`).join('\n')}
+` : ''}
+${hasLowPower ? `${infoComponents.filter(component => component.capability === 'low_power').map(component => `    if (g_state.${cIdentifier(component.id)}_value_label) lv_label_set_text_fmt(g_state.${cIdentifier(component.id)}_value_label, "%u Hz", HAL_RCC_GetHCLKFreq(CORE_ID_HCPU));`).join('\n')}
 ` : ''}
 }
 

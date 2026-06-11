@@ -943,7 +943,7 @@
 }
 
 .huangshan-builder-toggle {
-  grid-row: span 3;
+  grid-row: span 2;
   display: flex !important;
   flex-direction: row !important;
   align-items: center;
@@ -956,6 +956,37 @@
 
 .huangshan-builder-toggle input {
   width: auto;
+}
+
+.huangshan-component-truth {
+  grid-column: 1;
+  align-self: start;
+  width: max-content;
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--border-muted);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.huangshan-component-truth.real {
+  color: var(--accent-hover);
+  border-color: rgba(63, 185, 80, 0.42);
+  background: rgba(46, 160, 67, 0.1);
+}
+
+.huangshan-component-truth.placeholder {
+  color: var(--orange);
+  border-color: rgba(240, 165, 0, 0.38);
+  background: rgba(240, 165, 0, 0.09);
+}
+
+.huangshan-component-truth.ui-only {
+  color: var(--text-muted);
+  border-color: var(--border-muted);
+  background: var(--bg-secondary);
 }
 
 .huangshan-builder-item > input,

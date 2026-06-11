@@ -23,9 +23,19 @@ assert.match(messages[0].content, /ambient_light/)
 assert.match(messages[0].content, /magnetometer/)
 assert.match(messages[0].content, /adc_gpio/)
 assert.match(messages[0].content, /gpio_output/)
+assert.match(messages[0].content, /charger/)
+assert.match(messages[0].content, /tf_card/)
+assert.match(messages[0].content, /usb_fs/)
+assert.match(messages[0].content, /audio_pdm/)
+assert.match(messages[0].content, /bluetooth/)
+assert.match(messages[0].content, /low_power/)
 assert.match(messages[0].content, /motor/)
 assert.match(messages[0].content, /UART2 RX\/TX=PA18\/PA19/)
+assert.match(messages[0].content, /AW32001 charger=I2C2 PA10\/PA11 address 0x49/)
+assert.match(messages[0].content, /vibrator motor=customer\/peripherals\/vibrator PA44\/PA45/)
 assert.match(messages[0].content, /Never invent unavailable hardware readings/)
+assert.match(messages[0].content, /Prefer real capabilities with evidence patterns/)
+assert.match(messages[0].content, /Do not claim board verification until build artifacts and serial evidence exist/)
 assert.match(messages[1].content, /Sport Watch/)
 assert.match(messages[1].content, /运动手表首页/)
 
@@ -39,9 +49,10 @@ const fenced = `
     { "type": "metric", "capability": "imu", "label": "Heart", "value": "78 bpm" },
     { "type": "metric", "capability": "magnetometer", "label": "Compass", "value": "Ready" },
     { "type": "metric", "capability": "ambient_light", "label": "Light", "value": "12 lux" },
+    { "type": "metric", "capability": "charger", "label": "Charge", "value": "AW32001" },
     { "type": "battery", "capability": "battery", "label": "Battery", "value": "86%" },
-    { "type": "bluetooth", "capability": "bluetooth", "label": "BLE", "value": "Linked" },
-    { "type": "action", "capability": "motor", "label": "Vibe", "value": "Motor hook" },
+    { "type": "metric", "capability": "tf_card", "label": "TF", "value": "sd0" },
+    { "type": "action", "capability": "bluetooth", "label": "BLE", "value": "Advertising" },
     { "type": "raw_code", "label": "Unsafe", "value": "ignored" }
   ]
 }
@@ -60,8 +71,9 @@ assert.deepEqual(parsed.components.map(component => component.type), [
   'metric',
   'metric',
   'metric',
+  'metric',
   'battery',
-  'bluetooth',
+  'metric',
   'action',
 ])
 assert.deepEqual(parsed.components.map(component => component.id), [
@@ -69,21 +81,24 @@ assert.deepEqual(parsed.components.map(component => component.id), [
   'metric_1',
   'metric_2',
   'metric_3',
-  'battery_4',
-  'bluetooth_5',
-  'action_6',
+  'metric_4',
+  'battery_5',
+  'metric_6',
+  'action_7',
 ])
 assert.deepEqual(parsed.components.map(component => component.capability), [
   'status',
   'imu',
   'magnetometer',
   'ambient_light',
+  'charger',
   'battery',
+  'tf_card',
   'bluetooth',
-  'motor',
 ])
 assert.equal(parsed.components[1].label, 'Motion')
 assert.equal(parsed.components[1].value, 'LSM6DSL')
+assert.equal(parsed.components[4].implementation, 'real')
 
 const unsupportedParsed = extractHuangshanBuilderConfigFromAiText(JSON.stringify({
   displayName: 'Sport',
@@ -97,6 +112,17 @@ assert.deepEqual(unsupportedParsed.components.map(component => [component.capabi
   ['imu', 'Accel', 'x/y/z'],
   ['status', 'Weather', 'Unsupported on board'],
 ])
+assert.equal(unsupportedParsed.components[1].implementation, 'ui-only')
+
+const motorParsed = extractHuangshanBuilderConfigFromAiText(JSON.stringify({
+  displayName: 'BLE Motor',
+  description: 'Vibrator request.',
+  components: [
+    { type: 'bluetooth', capability: 'bluetooth', label: 'BLE', value: 'Advertising' },
+    { type: 'action', capability: 'motor', label: 'Buzz', value: 'Motor hook' },
+  ],
+}))
+assert.deepEqual(motorParsed.components.map(component => component.implementation), ['real', 'real'])
 
 assert.throws(
   () => extractHuangshanBuilderConfigFromAiText('not json', { displayName: 'Fallback', description: 'Fallback description.' }),

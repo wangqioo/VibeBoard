@@ -14,6 +14,8 @@ import {
 import { createRemoteOtaJob, formatLastSeen, getRemoteOtaJob, isDeviceOnline, listRemoteDevices, uploadFirmwareForRemoteOta } from '../utils/remoteOta'
 import { assembleCompileFiles } from '../utils/projectAssembly'
 import { OFFICIAL_EXAMPLES, getOfficialExample } from '../data/officialExamples'
+import { createBuildEvidence } from '../domain/evidence/buildEvidence'
+import { createDeliveryDeviceEvidence } from '../domain/evidence/deviceEvidence'
 import './CompilePanel.css'
 
 const BUILD = {
@@ -59,6 +61,12 @@ function summarizeCompileError(errorLog, buildLog) {
   return lines.slice(firstError, Math.min(lines.length, firstError + 14)).join('\n')
 }
 
+function formatBuildEvidenceValue(value) {
+  if (value === null || value === undefined || value === '') return null
+  if (Array.isArray(value)) return value.filter(Boolean).join(', ')
+  return String(value)
+}
+
 function copyTextFallback(text) {
   const textarea = document.createElement('textarea')
   textarea.value = text
@@ -89,6 +97,7 @@ export default function CompilePanel({
   onConsumeInitialAutoFlash,
   onClose,
   onRepairBuildFailure,
+  onDeviceEvidence,
 }) {
   const [compileMode, setCompileMode] = useState('project')
   const [officialExampleId, setOfficialExampleId] = useState(OFFICIAL_EXAMPLES[0]?.id || '')
@@ -229,7 +238,14 @@ export default function CompilePanel({
         })
       } else {
         if (!compilePackage.ok) {
+          const preflightEvidence = createBuildEvidence({
+            status: 'failure',
+            command: 'preflight-project-assembly',
+            error: compilePackage.message,
+            logLines: compilePackage.diagnostics || [],
+          })
           setErrorLog(compilePackage.message)
+          setBuildEvidence(preflightEvidence)
           setStatus('编译前检查失败')
           setBuildState('error')
           return
@@ -299,10 +315,28 @@ export default function CompilePanel({
         setOtaProgress(pct)
         setStatus(`推送中... ${pct}%`)
       })
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'wifi-ota',
+        status: 'success',
+        message: '固件推送成功，设备正在重启...',
+        firmwareSize: firmware.size,
+        progress: 100,
+        deliveryResult: { ip: otaIp },
+        deviceInfo,
+      }))
       setStatus('固件推送成功，设备正在重启...')
       setOtaState('ok')
       setDeviceInfo(null)
     } catch (e) {
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'wifi-ota',
+        status: 'failure',
+        message: e.message,
+        firmwareSize: firmware.size,
+        progress: otaProgress,
+        deliveryResult: { ip: otaIp },
+        deviceInfo,
+      }))
       setErrorLog(e.message)
       setStatus('OTA 推送失败')
       setOtaState('error')
@@ -330,9 +364,27 @@ export default function CompilePanel({
         setBleProgress(percent)
         setStatus(`BLE 烧录中... ${percent}%  (${(sent / 1024).toFixed(0)} / ${(total / 1024).toFixed(0)} KB)`)
       })
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'ble-ota',
+        status: 'success',
+        message: 'BLE 烧录成功，设备正在重启...',
+        firmwareSize: firmware.size,
+        progress: 100,
+        deliveryResult: { deviceName: session.deviceName },
+        deviceInfo: { name: session.deviceName },
+      }))
       setStatus('BLE 烧录成功，设备正在重启...')
       setBleState('ok')
     } catch (e) {
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'ble-ota',
+        status: 'failure',
+        message: e.message,
+        firmwareSize: firmware.size,
+        progress: bleProgress,
+        deliveryResult: { deviceName: session?.deviceName },
+        deviceInfo: session?.deviceName ? { name: session.deviceName } : null,
+      }))
       setErrorLog(e.message)
       setStatus('BLE 烧录失败')
       setBleState('error')
@@ -368,9 +420,25 @@ export default function CompilePanel({
           setTimeout(() => logEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
         },
       })
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'usb',
+        status: 'success',
+        message: 'USB 烧录完成，设备已复位',
+        firmwareSize: firmware.size,
+        progress: 100,
+        deliveryResult: { automatic },
+      }))
       setStatus('USB 烧录完成，设备已复位')
       setUsbState('ok')
     } catch (e) {
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'usb',
+        status: 'failure',
+        message: e.message,
+        firmwareSize: firmware.size,
+        progress: usbProgress,
+        deliveryResult: { automatic },
+      }))
       setErrorLog(e.message)
       setStatus('USB 烧录失败')
       setUsbState('error')
@@ -416,6 +484,14 @@ export default function CompilePanel({
     const selectedDevice = remoteDevices.find(device => device.deviceId === remoteDeviceId)
     if (!isDeviceOnline(selectedDevice)) {
       setRemoteState('error')
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'remote-ota',
+        status: 'failure',
+        message: '远程设备当前不在线。设备心跳每 10 秒一次，30 秒内没有心跳就不会下发 OTA。',
+        firmwareSize: firmware.size,
+        deliveryResult: { deviceId: remoteDeviceId },
+        deviceInfo: selectedDevice || { deviceId: remoteDeviceId },
+      }))
       setErrorLog('远程设备当前不在线。设备心跳每 10 秒一次，30 秒内没有心跳就不会下发 OTA。')
       setStatus('远程 OTA 失败')
       return
@@ -431,10 +507,26 @@ export default function CompilePanel({
         deviceId: remoteDeviceId,
         firmwareId: remoteFirmware.firmwareId,
       })
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'remote-ota',
+        status: 'queued',
+        message: '远程 OTA 已下发，等待设备领取',
+        firmwareSize: firmware.size,
+        deliveryResult: job,
+        deviceInfo: selectedDevice || { deviceId: remoteDeviceId },
+      }))
       setRemoteJob(job)
       setRemoteState('queued')
       setStatus(`远程 OTA 已下发，等待设备领取：${job.jobId.slice(0, 8)}`)
     } catch (e) {
+      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+        transport: 'remote-ota',
+        status: 'failure',
+        message: e.message,
+        firmwareSize: firmware.size,
+        deliveryResult: { deviceId: remoteDeviceId },
+        deviceInfo: selectedDevice || { deviceId: remoteDeviceId },
+      }))
       setErrorLog(e.message)
       setStatus('远程 OTA 失败')
       setRemoteState('error')
@@ -450,9 +542,25 @@ export default function CompilePanel({
         if (cancelled) return
         setRemoteJob(job)
         if (job.status === 'done' || job.status === 'flashed' || job.status === 'rebooting') {
+          onDeviceEvidence?.(createDeliveryDeviceEvidence({
+            transport: 'remote-ota',
+            status: 'success',
+            message: `远程 OTA 状态：${job.status}`,
+            firmwareSize: firmware?.size || null,
+            deliveryResult: job,
+            deviceInfo: remoteDevices.find(device => device.deviceId === job.deviceId) || { deviceId: job.deviceId },
+          }))
           setRemoteState('done')
           setStatus(`远程 OTA 状态：${job.status}`)
         } else if (job.status === 'failed') {
+          onDeviceEvidence?.(createDeliveryDeviceEvidence({
+            transport: 'remote-ota',
+            status: 'failure',
+            message: job.error || '远程 OTA 失败',
+            firmwareSize: firmware?.size || null,
+            deliveryResult: job,
+            deviceInfo: remoteDevices.find(device => device.deviceId === job.deviceId) || { deviceId: job.deviceId },
+          }))
           setRemoteState('error')
           setErrorLog(job.error || '远程 OTA 失败')
           setStatus('远程 OTA 失败')
@@ -476,6 +584,25 @@ export default function CompilePanel({
   const rm = REMOTE[remoteState]
   const failureSummary = buildState === 'error' ? summarizeCompileError(errorLog, buildLog) : ''
   const fullFailureLog = buildState === 'error' ? [...buildLog, errorLog].filter(Boolean).join('\n') : ''
+  const firstFailingLocation = buildEvidence?.firstError?.file
+    ? `${buildEvidence.firstError.file}${buildEvidence.firstError.lineNumber ? `:${buildEvidence.firstError.lineNumber}` : ''}`
+    : (buildEvidence?.repairContext?.primaryFile
+        ? `${buildEvidence.repairContext.primaryFile}${buildEvidence.repairContext.lineNumber ? `:${buildEvidence.repairContext.lineNumber}` : ''}`
+        : null)
+  const repairContextSummary = buildEvidence?.repairContext?.kind
+    ? [
+        buildEvidence.repairContext.kind,
+        buildEvidence.repairContext.confidence ? `confidence ${buildEvidence.repairContext.confidence}` : null,
+      ].filter(Boolean).join(' · ')
+    : null
+  const buildEvidenceRows = [
+    { label: '失败分类', value: buildEvidence?.failureCategory || buildEvidence?.repairContext?.category },
+    { label: '首个失败位置', value: firstFailingLocation },
+    { label: '修复上下文', value: repairContextSummary },
+    { label: '修复策略', value: buildEvidence?.repairContext?.repairStrategy || buildEvidence?.repairStrategy },
+  ]
+    .map(row => ({ ...row, value: formatBuildEvidenceValue(row.value) }))
+    .filter(row => row.value)
 
   return (
     <div className="compile-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -755,6 +882,19 @@ export default function CompilePanel({
             <div className={`compile-status ${otaState === 'ok' ? 'ok' : buildState}`}>
               {status}
             </div>
+          )}
+          {buildState === 'error' && buildEvidence && buildEvidenceRows.length > 0 && (
+            <section className="build-evidence-panel" aria-label="Build Evidence">
+              <div className="build-evidence-title">Build Evidence</div>
+              <dl className="build-evidence-grid">
+                {buildEvidenceRows.map(row => (
+                  <div className="build-evidence-row" key={row.label}>
+                    <dt className="build-evidence-label">{row.label}</dt>
+                    <dd className="build-evidence-value">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
           )}
           {failureSummary && (
             <div className="log-wrap">

@@ -46,6 +46,7 @@
 .nordic-board-card,
 .nordic-status,
 .nordic-command-box,
+.nordic-build-panel,
 .nordic-capability-list {
   border: 1px solid var(--border);
   background: var(--bg-primary);
@@ -80,6 +81,10 @@
   margin-top: 6px;
 }
 
+.nordic-build-panel {
+  display: block;
+}
+
 .nordic-capability {
   display: flex;
   align-items: center;
@@ -90,6 +95,7 @@
 }
 
 .nordic-primary,
+.nordic-secondary,
 .nordic-chat-header button,
 .nordic-prompts button,
 .nordic-files button {
@@ -108,6 +114,50 @@
 .nordic-primary:disabled {
   opacity: 0.55;
   cursor: wait;
+}
+
+.nordic-secondary {
+  min-height: 32px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+}
+
+.nordic-build-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.nordic-build-meta {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.nordic-artifacts {
+  display: grid;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.nordic-artifacts code {
+  color: var(--accent-hover);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.nordic-build-log {
+  max-height: 140px;
+  margin: 10px 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .nordic-overview {

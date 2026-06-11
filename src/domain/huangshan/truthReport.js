@@ -1,7 +1,7 @@
 import { getHuangshanCapabilityContract } from './capabilityContracts.js'
 
 const UI_ONLY_CAPABILITIES = new Set(['status'])
-const PLACEHOLDER_CAPABILITIES = new Set(['bluetooth', 'motor'])
+const PLACEHOLDER_CAPABILITIES = new Set([])
 
 export function createHuangshanTruthReport({
   config = {},

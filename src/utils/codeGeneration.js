@@ -878,12 +878,55 @@ Regenerate the complete corrected application source now.`,
   ]
 }
 
-export function buildBuildRepairMessages({ board, selectedSkills = [], buildEvidence, buildLog = [], errorLog = '', projectFiles = {} }) {
+function formatDriverContractSection(driverContracts = []) {
+  if (!Array.isArray(driverContracts) || driverContracts.length === 0) return ''
+
+  const lines = driverContracts.map(contract => {
+    if (typeof contract === 'string') return `- ${contract}`
+    return [
+      `- ${contract.id || 'unknown'}${contract.label ? ` (${contract.label})` : ''}${contract.skillId ? `, skill=${contract.skillId}` : ''}`,
+      `  requiredInit: ${(contract.requiredInit || []).join(' -> ') || 'none'}`,
+      `  allowedApis: ${(contract.allowedApis || []).join(', ') || 'none'}`,
+      `  forbiddenApis: ${(contract.forbiddenApis || []).join(', ') || 'none'}`,
+      `  acceptanceChecks: ${(contract.acceptanceChecks || []).join('; ') || 'none'}`,
+      `  commonFailures: ${(contract.commonFailures || []).join('; ') || 'none'}`,
+    ].join('\n')
+  }).join('\n')
+
+  return `Driver Contracts:
+${lines}`
+}
+
+export function buildBuildRepairMessages({
+  board,
+  selectedSkills = [],
+  buildEvidence,
+  buildLog = [],
+  errorLog = '',
+  projectFiles = {},
+  manifest = null,
+  activeFile = '',
+  driverContracts = [],
+  recentDeviceEvidence = null,
+}) {
   const editableFiles = Object.fromEntries(
     Object.entries(projectFiles || {}).filter(([path]) => !path.startsWith('__'))
   )
   const officialExampleGuidance = buildOfficialExampleGuidance(board)
   const repairContext = buildEvidence?.repairContext || null
+  const manifestSection = manifest
+    ? `Program Manifest:
+${JSON.stringify(manifest, null, 2)}`
+    : ''
+  const activeFileSection = activeFile
+    ? `Active file:
+${activeFile}`
+    : ''
+  const driverContractsSection = formatDriverContractSection(driverContracts)
+  const recentDeviceEvidenceSection = recentDeviceEvidence
+    ? `Recent Device Evidence:
+${JSON.stringify(recentDeviceEvidence, null, 2)}`
+    : ''
   return [
     {
       role: 'system',
@@ -920,7 +963,7 @@ Rules:
     },
     {
       role: 'user',
-      content: `Build Evidence:
+      content: `${manifestSection}${manifestSection ? '\n\n' : ''}${activeFileSection}${activeFileSection ? '\n\n' : ''}${driverContractsSection}${driverContractsSection ? '\n\n' : ''}${recentDeviceEvidenceSection}${recentDeviceEvidenceSection ? '\n\n' : ''}Build Evidence:
 ${JSON.stringify(buildEvidence || {}, null, 2)}
 
 Repair Context:

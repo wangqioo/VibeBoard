@@ -16,3 +16,15 @@ services:
     volumes:
       - ${VIBEBOARD_BUILD_CACHE:-/home/wq/vibeboard-build-cache}:/tmp/builds
       - ${VIBEBOARD_REMOTE_OTA_STATE:-/home/wq/vibeboard-remote-ota}:/tmp/vibeboard-remote-ota
+
+  nordic-compiler:
+    image: nordic-compiler:latest
+    container_name: nordic-compiler
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      NORDIC_BUILD_BASE: /tmp/nordic-builds
+    volumes:
+      - ${VIBEBOARD_NORDIC_BUILD_CACHE:-/home/wq/vibeboard-nordic-build-cache}:/tmp/nordic-builds
+      - ${NORDIC_TOOLCHAIN_DIR:-/home/wq/nordic-toolchain/ncs}:/opt/ncs:ro
+      - ${ZEPHYR_SDK_DIR:-/home/wq/nordic-toolchain/zephyr-sdk-0.17.4}:/opt/zephyr-sdk-0.17.4:ro

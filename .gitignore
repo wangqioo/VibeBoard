@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .worktrees/
+.superpowers/
 .compiler-build-cache/
 .remote-ota-state/
 __pycache__/

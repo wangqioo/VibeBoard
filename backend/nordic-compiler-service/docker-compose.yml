@@ -1,0 +1,19 @@
+services:
+  nordic-compiler:
+    build: .
+    image: nordic-compiler:latest
+    container_name: nordic-compiler
+    restart: unless-stopped
+    ports:
+      - "8772:8772"
+    environment:
+      NORDIC_BUILD_BASE: /tmp/nordic-builds
+    volumes:
+      - ${VIBEBOARD_NORDIC_BUILD_CACHE:-./.nordic-build-cache}:/tmp/nordic-builds
+      - ${NORDIC_TOOLCHAIN_DIR:-/opt/ncs}:/opt/ncs:ro
+      - ${ZEPHYR_SDK_DIR:-/opt/zephyr-sdk-0.17.4}:/opt/zephyr-sdk-0.17.4:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8g

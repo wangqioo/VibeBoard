@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import ChatPanel from './components/ChatPanel'
 import LogPanel from './components/LogPanel'
 import SettingsModal from './components/SettingsModal'
@@ -16,6 +16,8 @@ import { isSourcePath } from './utils/filePlacement'
 import { normalizeGeneratedSourceFiles } from './utils/projectValidation'
 import { normalizeApplicationFiles } from './domain/compilePackage/compilePackage'
 import { DIGITAL_TWIN_MANIFEST_KEY } from './domain/digitalTwin/uiManifest'
+import { createDeviceRepairContext } from './domain/evidence/deviceEvidence'
+import { evaluateAcceptanceChecks } from './domain/workflow/acceptanceChecks'
 import { NORDIC_BOARD_ID } from './domain/nordic/boardProfile'
 import { stablePreviewFingerprint } from './utils/preview'
 import bspHeader from '../backend/compiler-service/template/components/esp32_s3_szp/esp32_s3_szp.h?raw'
@@ -110,6 +112,7 @@ export default function App() {
   const [selectedSkills, setSelectedSkills] = useState([])
   const [latestManifest, setLatestManifest] = useState(null)
   const [latestPreviewContext, setLatestPreviewContext] = useState(null)
+  const [latestDeviceEvidence, setLatestDeviceEvidence] = useState(null)
   const [latestCompileArtifact, setLatestCompileArtifact] = useState(null)
   const board = BOARDS[boardId]
   const generatedFiles = buildGeneratedConfig(boardId, selectedSkills)
@@ -163,6 +166,7 @@ export default function App() {
     setSelectedSkills([])
     setLatestManifest(null)
     setLatestPreviewContext(null)
+    setLatestDeviceEvidence(null)
     setActiveFile(Object.keys(files)[0] || '')
     setPendingLogAnalysis(null)
     setPendingBuildRepair(null)
@@ -176,6 +180,7 @@ export default function App() {
     setSelectedSkills([])
     setLatestManifest(null)
     setLatestPreviewContext(null)
+    setLatestDeviceEvidence(null)
     setLatestCompileArtifact(null)
     setActiveFile(Object.keys(files)[0] || '')
   }, [boardId])
@@ -233,6 +238,11 @@ export default function App() {
     latestCompileArtifact.fingerprint === currentCompileFingerprint()
       ? latestCompileArtifact
       : null
+  const acceptanceState = useMemo(() => evaluateAcceptanceChecks({
+    manifest: latestManifest,
+    buildEvidence: latestCompileArtifact?.buildEvidence || latestCompileArtifact?.firmware?.buildEvidence || null,
+    deviceEvidence: latestDeviceEvidence,
+  }), [latestCompileArtifact, latestDeviceEvidence, latestManifest])
 
   const hasConfig = settings.apiKey && settings.baseUrl && settings.model
   const currentPlatformBoardId = workspaceMode === 'nordic' ? NORDIC_BOARD_ID : boardId
@@ -347,6 +357,8 @@ export default function App() {
                   projectFiles={projectFiles}
                   latestManifest={latestManifest}
                   previewContext={latestPreviewContext}
+                  recentDeviceEvidence={latestDeviceEvidence}
+                  acceptanceState={acceptanceState}
                   activeFile={activeFile}
                   selectedSkills={selectedSkills}
                   onSkillsChange={handleSkillsChange}
@@ -355,8 +367,17 @@ export default function App() {
               </div>
               <div className={`right-tab-panel ${rightTab === 'log' ? 'active' : ''}`}>
                 <LogPanel
-                  onAnalyze={(logs) => {
+                  onDeviceEvidence={setLatestDeviceEvidence}
+                  onAnalyze={(logs, deviceEvidence) => {
+                    const evidence = deviceEvidence || latestDeviceEvidence
+                    if (evidence) setLatestDeviceEvidence(evidence)
+                    const deviceRepairContext = createDeviceRepairContext({
+                      deviceEvidence: evidence,
+                      manifest: latestManifest,
+                      userSymptom: '用户请求 AI 分析设备日志。',
+                    })
                     setPendingLogAnalysis(`请帮我分析以下 ESP32 设备日志，找出问题原因并给出修复建议：\n\n\`\`\`\n${logs}\n\`\`\``)
+                    setPendingBuildRepair(prev => prev ? { ...prev, recentDeviceEvidence: deviceRepairContext } : prev)
                     setRightTab('chat')
                   }}
                 />
@@ -390,8 +411,18 @@ export default function App() {
           onConsumeInitialAutoFlash={() => {
             setLatestCompileArtifact(prev => prev ? { ...prev, autoFlash: false } : prev)
           }}
+          onDeviceEvidence={setLatestDeviceEvidence}
           onRepairBuildFailure={(request) => {
-            setPendingBuildRepair(request)
+            setPendingBuildRepair({
+              ...request,
+              recentDeviceEvidence: latestDeviceEvidence
+                ? createDeviceRepairContext({
+                    deviceEvidence: latestDeviceEvidence,
+                    manifest: latestManifest,
+                    userSymptom: '编译修复时附带最近一次设备日志证据。',
+                  })
+                : null,
+            })
             setRightTab('chat')
           }}
           onClose={() => setShowCompile(false)}

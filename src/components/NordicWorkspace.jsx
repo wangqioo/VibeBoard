@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { NORDIC_BOARD_PROFILE, listNordicCapabilities } from '../domain/nordic/boardProfile'
 import { createDefaultNordicConfig, createNordicAppFiles, normalizeNordicAppName } from '../domain/nordic/appTemplate'
+import { checkNordicCompilerHealth, compileNordicProject } from '../utils/nordicCompiler'
 import './NordicWorkspace.css'
 
 const QUICK_PROMPTS = [
@@ -16,6 +17,10 @@ export default function NordicWorkspace({ onOpenSettings }) {
   const [activeFile, setActiveFile] = useState('src/main.c')
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useState('nRF Connect SDK 工程已就绪。')
+  const [buildState, setBuildState] = useState('idle')
+  const [buildResult, setBuildResult] = useState(null)
+  const [buildLog, setBuildLog] = useState('')
+  const [health, setHealth] = useState(null)
   const capabilities = useMemo(() => listNordicCapabilities(), [])
   const activeContent = files[activeFile] || ''
   const selectedCaps = new Set(config.capabilities)
@@ -38,6 +43,9 @@ export default function NordicWorkspace({ onOpenSettings }) {
     setConfig(normalized)
     setFiles(nextFiles)
     setActiveFile(nextFiles[activeFile] ? activeFile : 'src/main.c')
+    setBuildResult(null)
+    setBuildLog('')
+    setBuildState('idle')
     setStatus(`已生成 ${normalized.appName}，目标板 ${normalized.boardTarget}`)
   }
 
@@ -59,6 +67,44 @@ export default function NordicWorkspace({ onOpenSettings }) {
 
   const westBuild = `west build -b ${config.boardTarget} .`
 
+  async function handleHealthCheck() {
+    setBuildState('checking')
+    setStatus('正在检查 Nordic 编译服务...')
+    try {
+      const result = await checkNordicCompilerHealth()
+      setHealth(result)
+      setBuildState('idle')
+      setStatus(`Nordic 编译服务：${result.status}`)
+    } catch (error) {
+      setBuildState('error')
+      setStatus(`Nordic 编译服务不可用：${error.message}`)
+    }
+  }
+
+  async function handleBuild() {
+    setBuildState('building')
+    setBuildResult(null)
+    setBuildLog('服务器 west build 正在运行...')
+    setStatus('正在提交到服务器 west build...')
+    try {
+      const result = await compileNordicProject({
+        files,
+        boardTarget: config.boardTarget,
+      })
+      setBuildResult(result)
+      setBuildLog(result.log || '')
+      setBuildState(result.status === 'ok' ? 'ok' : 'error')
+      setStatus(result.status === 'ok'
+        ? `Nordic 构建完成：${result.projectId?.slice(0, 8) || 'unknown'}`
+        : 'Nordic 构建失败')
+    } catch (error) {
+      setBuildResult(error.result || null)
+      setBuildLog(error.result?.log || error.message)
+      setBuildState('error')
+      setStatus(`Nordic 构建失败：${error.message}`)
+    }
+  }
+
   return (
     <div className="nordic-workspace">
       <aside className="nordic-sidebar">
@@ -73,6 +119,32 @@ export default function NordicWorkspace({ onOpenSettings }) {
           <div className="nordic-heading">west</div>
           <code>{westBuild}</code>
           <code>west flash</code>
+        </div>
+        <div className="nordic-build-panel">
+          <div className="nordic-heading">服务器 west build</div>
+          {health && (
+            <div className="nordic-build-meta">
+              {health.status} · {health.buildTool} · {health.defaultBoardTarget}
+            </div>
+          )}
+          <div className="nordic-build-actions">
+            <button className="nordic-secondary" onClick={handleHealthCheck} disabled={buildState === 'checking' || buildState === 'building'}>
+              检查服务
+            </button>
+            <button className="nordic-primary" onClick={handleBuild} disabled={buildState === 'building'}>
+              {buildState === 'building' ? '构建中...' : '服务器构建'}
+            </button>
+          </div>
+          {buildResult?.artifacts?.length > 0 && (
+            <div className="nordic-artifacts">
+              {buildResult.artifacts.map(artifact => (
+                <code key={artifact.relativePath}>
+                  {artifact.relativePath} · {(artifact.size / 1024).toFixed(1)} KB
+                </code>
+              ))}
+            </div>
+          )}
+          {buildLog && <pre className="nordic-build-log">{buildLog}</pre>}
         </div>
         <div className="nordic-capability-list">
           <div className="nordic-heading">能力</div>
@@ -141,7 +213,7 @@ export default function NordicWorkspace({ onOpenSettings }) {
         </div>
         <div className="nordic-chat-body">
           <p>描述需求后会生成真实 Zephyr 工程文件，包含 CMake、prj.conf 和 src/main.c。</p>
-          <p>第一版先生成代码和 west 命令，后续接入服务器 west build、J-Link/nrfjprog 烧录和设备证据。</p>
+          <p>当前已接入服务器 west build；J-Link/nrfjprog 烧录和设备证据后续接入。</p>
           <div className="nordic-prompts">
             {QUICK_PROMPTS.map(item => (
               <button key={item} onClick={() => setPrompt(item)}>{item}</button>

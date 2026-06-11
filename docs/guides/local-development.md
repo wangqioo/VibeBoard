@@ -7,6 +7,15 @@
 - Docker if you need the ESP-IDF compiler service locally.
 - Python only for compiler-service security tests.
 
+Compiler-service Python tests import the Flask server module directly. Install
+those dependencies in a repo-local virtual environment:
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r backend/compiler-service/requirements-dev.txt
+```
+
 ## Start The Frontend
 
 ```bash
@@ -39,6 +48,7 @@ Workflow and evidence:
 
 ```bash
 npm run test:build-evidence
+npm run test:device-evidence
 npm run test:hardware-workflow
 npm run test:workflow-compiler-adapter
 ```
@@ -46,6 +56,7 @@ npm run test:workflow-compiler-adapter
 Compiler and delivery guards:
 
 ```bash
+npm run test:python-runner
 npm run test:compiler-security
 npm run test:official-examples-backend
 npm run test:remote-ota-backend
@@ -75,6 +86,15 @@ npm run test:huangshan-device-actions
 npm run test:huangshan-semantic-preview
 npm run test:huangshan-real-preview
 npm run test:huangshan-workspace-ui
+```
+
+Nordic workspace:
+
+```bash
+npm run test:nordic-app-template
+npm run test:nordic-workspace-ui
+npm run test:nordic-compiler-service
+npm run test:nordic-compiler-service-config
 ```
 
 Build the browser app:
