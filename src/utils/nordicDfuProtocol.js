@@ -208,9 +208,12 @@ export function selectNordicDfuArtifact(artifacts = []) {
 
 export function selectNordicUf2Artifact(artifacts = []) {
   const candidates = Array.isArray(artifacts) ? artifacts : []
+  const isUf2 = artifact => artifact?.uf2 === true || /zephyr\.uf2$|\.uf2$/.test(artifact?.name || artifact?.relativePath || '')
+  const isBootloader = artifact => /(^|\/)build\/mcuboot\/|(^|\/)mcuboot\//.test(artifact?.relativePath || '')
   return (
-    candidates.find(artifact => artifact?.uf2 === true && /\.uf2$/.test(artifact.name || artifact.relativePath || '')) ||
-    candidates.find(artifact => /zephyr\.uf2$|\.uf2$/.test(artifact?.name || artifact?.relativePath || '')) ||
+    candidates.find(artifact => isUf2(artifact) && /zephyr\.uf2$/.test(artifact.name || artifact.relativePath || '') && !isBootloader(artifact)) ||
+    candidates.find(artifact => isUf2(artifact) && !isBootloader(artifact)) ||
+    candidates.find(isUf2) ||
     null
   )
 }

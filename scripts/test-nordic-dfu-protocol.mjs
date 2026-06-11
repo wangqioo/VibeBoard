@@ -10,6 +10,7 @@ import {
   encodeSerialPacket,
   parseSmpPacket,
   selectNordicDfuArtifact,
+  selectNordicUf2Artifact,
 } from '../src/utils/nordicDfuProtocol.js'
 
 const payload = new Uint8Array(260).map((_, index) => index & 0xff)
@@ -70,5 +71,12 @@ const artifacts = [
 ]
 assert.equal(selectNordicDfuArtifact(artifacts).name, 'zephyr.signed.bin')
 assert.equal(selectNordicDfuArtifact([]), null)
+
+const uf2Artifacts = [
+  { name: 'zephyr.uf2', relativePath: 'a/build/mcuboot/zephyr/zephyr.uf2', uf2: true },
+  { name: 'zephyr.uf2', relativePath: 'a/build/a/zephyr/zephyr.uf2', uf2: true },
+]
+assert.equal(selectNordicUf2Artifact(uf2Artifacts).relativePath, 'a/build/a/zephyr/zephyr.uf2')
+assert.equal(selectNordicUf2Artifact([]), null)
 
 console.log('nordic dfu protocol tests passed')

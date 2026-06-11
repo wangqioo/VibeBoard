@@ -274,7 +274,7 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
             下载 UF2
           </button>
           <div className="nordic-dfu-note">
-            XIAO 双击 reset 进入 UF2/U 盘模式后，把 zephyr.uf2 拖进去。这是最适合首次烧录和手动恢复的路径。
+            首次烧录或恢复时，XIAO 双击 reset 进入 UF2/U 盘模式后，把 zephyr.uf2 拖进去。
           </div>
         </div>
         <div className="nordic-dfu-panel">
@@ -296,7 +296,7 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
             <span style={{ width: `${dfuProgress}%` }} />
           </div>
           <div className="nordic-dfu-note">
-            需要板子当前固件已经启用 MCUboot + MCUmgr；之后可用浏览器上传 zephyr.signed.bin。
+            需要板子已运行 VibeBoard 固件，并启用 MCUboot + MCUmgr；之后可用浏览器上传 zephyr.signed.bin。
           </div>
           {(dfuUnavailable || dfuLog) && (
             <pre className="nordic-dfu-log">{dfuLog || dfuUnavailable}</pre>
