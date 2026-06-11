@@ -3,7 +3,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  createArtifactDownloadUrl,
   healthPayload,
+  listArtifacts,
   normalizeBoardTarget,
   sanitizeNordicFilePath,
   writeNordicProject,
@@ -11,8 +13,11 @@ import {
 
 assert.equal(sanitizeNordicFilePath('CMakeLists.txt'), 'CMakeLists.txt')
 assert.equal(sanitizeNordicFilePath('prj.conf'), 'prj.conf')
+assert.equal(sanitizeNordicFilePath('sysbuild.conf'), 'sysbuild.conf')
+assert.equal(sanitizeNordicFilePath('README.md'), 'README.md')
 assert.equal(sanitizeNordicFilePath('src/main.c'), 'src/main.c')
 assert.equal(sanitizeNordicFilePath('boards/nrf52840dk_nrf52840.overlay'), 'boards/nrf52840dk_nrf52840.overlay')
+assert.equal(sanitizeNordicFilePath('sysbuild/mcuboot/prj.conf'), 'sysbuild/mcuboot/prj.conf')
 assert.throws(() => sanitizeNordicFilePath('../escape.c'), /Unsafe Nordic file path/)
 assert.throws(() => sanitizeNordicFilePath('/tmp/escape.c'), /Unsafe Nordic file path/)
 assert.throws(() => sanitizeNordicFilePath('west.yml'), /Unsafe Nordic file path/)
@@ -27,6 +32,7 @@ try {
     files: {
       'CMakeLists.txt': 'cmake_minimum_required(VERSION 3.20.0)\nfind_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})\nproject(test)\ntarget_sources(app PRIVATE src/main.c)\n',
       'prj.conf': 'CONFIG_GPIO=y\n',
+      'sysbuild.conf': 'SB_CONFIG_BOOTLOADER_MCUBOOT=y\n',
       'src/main.c': '#include <zephyr/kernel.h>\nint main(void) { return 0; }\n',
     },
   }
@@ -34,6 +40,7 @@ try {
   assert.equal(project.boardTarget, 'nrf52840dk/nrf52840')
   assert.ok(project.writtenFiles.includes('CMakeLists.txt'))
   assert.ok(project.writtenFiles.includes('prj.conf'))
+  assert.ok(project.writtenFiles.includes('sysbuild.conf'))
   assert.ok(project.writtenFiles.includes('src/main.c'))
   const missingMain = { ...payload.files }
   delete missingMain['src/main.c']
@@ -43,6 +50,27 @@ try {
   )
 } finally {
   rmSync(workspace, { recursive: true, force: true })
+}
+
+const artifactsWorkspace = mkdtempSync(join(tmpdir(), 'nordic-artifacts-'))
+try {
+  const buildDir = join(artifactsWorkspace, 'project-a', 'build')
+  const zephyrDir = join(buildDir, 'zephyr')
+  mkdtempSync(join(tmpdir(), 'nordic-unused-'))
+  await import('node:fs').then(({ mkdirSync, writeFileSync }) => {
+    mkdirSync(zephyrDir, { recursive: true })
+    writeFileSync(join(zephyrDir, 'zephyr.signed.bin'), 'signed')
+    writeFileSync(join(zephyrDir, 'merged.hex'), 'hex')
+  })
+  const artifacts = listArtifacts(buildDir, artifactsWorkspace)
+  const dfuArtifact = artifacts.find(artifact => artifact.name === 'zephyr.signed.bin')
+  assert.equal(dfuArtifact.role, 'dfu-image')
+  assert.equal(dfuArtifact.dfu, true)
+  assert.ok(dfuArtifact.url.includes('/nordic/artifact?path='))
+  assert.equal(createArtifactDownloadUrl(dfuArtifact.relativePath), dfuArtifact.url)
+  assert.equal(artifacts.find(artifact => artifact.name === 'merged.hex').role, 'initial-flash')
+} finally {
+  rmSync(artifactsWorkspace, { recursive: true, force: true })
 }
 
 const health = healthPayload()

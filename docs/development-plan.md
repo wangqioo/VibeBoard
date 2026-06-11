@@ -271,6 +271,154 @@ Goal: make the deployed system recoverable and inspectable.
 - Container recreation does not erase compiler cache or OTA state.
 - Health check failures identify the failing service, not just "site down".
 
+## Nordic nRF Track Status - 2026-06-11
+
+Goal: add a Nordic nRF path that keeps heavy NCS/Zephyr builds on the home
+server and uses the browser only for local serial DFU when the board is already
+running MCUboot + MCUmgr.
+
+### Completed
+
+- Added a Nordic workspace path for nRF52840 DK / `nrf52840dk/nrf52840`.
+- Added a standalone nRF compiler service under
+  `backend/nordic-compiler-service/server.mjs`.
+- Deployed the nRF compiler service on the home server:
+  - host: `192.168.1.15`
+  - user systemd unit: `vibeboard-nordic.service`
+  - port: `8772`
+  - nginx route: `http://127.0.0.1:4100/nordic/*`
+  - NCS: `/home/wq/nordic-toolchain/ncs`
+  - Zephyr SDK: `/home/wq/nordic-toolchain/zephyr-sdk-0.17.4`
+- Added Nordic generated project files:
+  - `CMakeLists.txt`
+  - `prj.conf`
+  - `sysbuild.conf`
+  - `src/main.c`
+  - `README.md`
+- Added MCUboot and MCUmgr serial DFU configuration to generated nRF projects:
+  - `SB_CONFIG_BOOTLOADER_MCUBOOT=y`
+  - `CONFIG_BOOTLOADER_MCUBOOT=y`
+  - `CONFIG_MCUMGR=y`
+  - `CONFIG_MCUMGR_TRANSPORT_UART=y`
+  - `CONFIG_MCUMGR_GRP_IMG=y`
+  - `CONFIG_MCUMGR_GRP_OS=y`
+  - `CONFIG_IMG_MANAGER=y`
+  - `CONFIG_MCUBOOT_IMG_MANAGER=y`
+  - `CONFIG_FLASH=y`
+  - `CONFIG_FLASH_MAP=y`
+  - `CONFIG_STREAM_FLASH=y`
+  - `CONFIG_BASE64=y`
+  - `CONFIG_CRC=y`
+  - `CONFIG_ZCBOR=y`
+- Added server artifact discovery and download for Nordic build outputs.
+  `zephyr.signed.bin` is marked as the DFU image.
+- Added browser-side Nordic Web Serial DFU modules:
+  - `src/utils/nordicDfuProtocol.js`
+  - `src/utils/nordicDfu.js`
+- Added Nordic workspace UI state for:
+  - server build
+  - DFU artifact selection
+  - Web Serial DFU progress
+  - DFU log output
+- Added Nordic build failure summarization so the UI shows the first useful
+  compiler/Kconfig/CMake error and keeps the full `west build` log behind
+  `展开完整日志`.
+- Added tests:
+  - `npm run test:nordic-app-template`
+  - `npm run test:nordic-compiler-service`
+  - `npm run test:nordic-compiler-service-config`
+  - `npm run test:nordic-workspace-ui`
+  - `npm run test:nordic-build-log-summary`
+  - `npm run test:nordic-dfu-protocol`
+  - `npm run test:nordic-dfu-ui`
+
+### Verified
+
+- Home-server nRF service health returns `ok`.
+- Real server-side `west build` succeeds for the generated default BLE/GPIO/UART
+  Nordic project.
+- The build produces `zephyr.signed.bin` with artifact metadata like:
+
+```text
+name: zephyr.signed.bin
+role: dfu-image
+dfu: true
+```
+
+- The artifact download route returns the signed image with the expected byte
+  count.
+- Frontend static deployment on `esp32-vibe-coder` was updated after the BLE
+  template fix. The deployed JS bundle no longer contains the old
+  `BT_LE_ADV_CONN_NAME` macro and does contain `BT_LE_ADV_CONN_FAST_1`.
+
+### Important Findings
+
+- nRF browser flashing is not the same as ESP32 Web Serial flashing.
+  The browser can do serial DFU only after the board already has compatible
+  MCUboot + MCUmgr firmware.
+- First-time provisioning still needs a non-browser path such as `west flash`,
+  J-Link, or another trusted factory flash step.
+- Web Serial requires a secure browser context. For LAN testing, use an SSH
+  tunnel and open:
+
+```sh
+ssh -N -L 4100:127.0.0.1:4100 192.168.1.15
+```
+
+```text
+http://localhost:4100/
+```
+
+- The first generated BLE template used `BT_LE_ADV_CONN_NAME`, which fails on
+  the deployed NCS v3.3.1 / Zephyr 4.3.99 toolchain. It was replaced with the
+  Zephyr sample-compatible pattern:
+  - `BT_LE_ADV_CONN_FAST_1`
+  - `BT_DATA_NAME_COMPLETE`
+  - explicit advertising and scan-response arrays.
+
+### Known Gaps
+
+- Full real-board browser DFU has not been completed yet.
+- The connected board appeared locally as `/dev/cu.usbmodem1101`, but the
+  Web Serial upload result was not captured before pausing.
+- The Mac does not currently have `nrfjprog`, `JLinkExe`, `mcumgr`, or
+  `nrfutil` on `PATH`, so local command-line recovery/probing is limited.
+- Browser cache can keep an old static JS bundle. After frontend deployment,
+  use a hard refresh before retrying:
+
+```text
+Cmd + Shift + R
+```
+
+### Next Session Checklist
+
+1. Confirm the SSH tunnel is active and the browser is using
+   `http://localhost:4100/`.
+2. Hard-refresh the browser page.
+3. Confirm the Nordic page builds a project and shows a `zephyr.signed.bin`
+   DFU artifact.
+4. Click `串口烧录` and choose the board serial port, expected on this Mac as
+   `/dev/cu.usbmodem1101`.
+5. Capture the exact Web Serial DFU log:
+   - port open
+   - artifact download
+   - upload offset/progress
+   - image test state
+   - reset command
+6. If DFU fails, classify the failure:
+   - browser cannot open serial
+   - serial opens but no MCUmgr response
+   - upload offset stalls
+   - image state/test fails
+   - reset fails
+   - board reboots but does not run the new image
+7. If recovery is needed, install or locate local tools for the Mac:
+   - Nordic Command Line Tools / `nrfjprog`
+   - SEGGER J-Link / `JLinkExe`
+   - `mcumgr` or `nrfutil`
+8. After real-board DFU succeeds, add a short guide under `docs/guides/` for
+   Nordic provisioning and browser DFU.
+
 ## Near-Term Execution Queue
 
 These are the recommended next commits, in order:

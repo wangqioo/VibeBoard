@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { NORDIC_BOARD_PROFILE, listNordicCapabilities } from '../domain/nordic/boardProfile'
 import { createDefaultNordicConfig, createNordicAppFiles, normalizeNordicAppName } from '../domain/nordic/appTemplate'
-import { checkNordicCompilerHealth, compileNordicProject } from '../utils/nordicCompiler'
+import { checkNordicCompilerHealth, compileNordicProject, downloadNordicArtifact, summarizeNordicBuildFailure } from '../utils/nordicCompiler'
+import { flashNordicOverSerial, nordicDfuUnavailableReason } from '../utils/nordicDfu'
+import { selectNordicDfuArtifact } from '../utils/nordicDfuProtocol'
 import './NordicWorkspace.css'
 
 const QUICK_PROMPTS = [
@@ -20,10 +22,17 @@ export default function NordicWorkspace({ onOpenSettings }) {
   const [buildState, setBuildState] = useState('idle')
   const [buildResult, setBuildResult] = useState(null)
   const [buildLog, setBuildLog] = useState('')
+  const [buildSummary, setBuildSummary] = useState(null)
+  const [showFullBuildLog, setShowFullBuildLog] = useState(false)
   const [health, setHealth] = useState(null)
+  const [dfuState, setDfuState] = useState('idle')
+  const [dfuProgress, setDfuProgress] = useState(0)
+  const [dfuLog, setDfuLog] = useState('')
   const capabilities = useMemo(() => listNordicCapabilities(), [])
   const activeContent = files[activeFile] || ''
   const selectedCaps = new Set(config.capabilities)
+  const dfuArtifact = selectNordicDfuArtifact(buildResult?.artifacts || [])
+  const dfuUnavailable = nordicDfuUnavailableReason()
 
   function updateCapability(id) {
     setConfig(prev => {
@@ -45,7 +54,12 @@ export default function NordicWorkspace({ onOpenSettings }) {
     setActiveFile(nextFiles[activeFile] ? activeFile : 'src/main.c')
     setBuildResult(null)
     setBuildLog('')
+    setBuildSummary(null)
+    setShowFullBuildLog(false)
     setBuildState('idle')
+    setDfuState('idle')
+    setDfuProgress(0)
+    setDfuLog('')
     setStatus(`已生成 ${normalized.appName}，目标板 ${normalized.boardTarget}`)
   }
 
@@ -84,6 +98,8 @@ export default function NordicWorkspace({ onOpenSettings }) {
   async function handleBuild() {
     setBuildState('building')
     setBuildResult(null)
+    setBuildSummary(null)
+    setShowFullBuildLog(false)
     setBuildLog('服务器 west build 正在运行...')
     setStatus('正在提交到服务器 west build...')
     try {
@@ -93,15 +109,39 @@ export default function NordicWorkspace({ onOpenSettings }) {
       })
       setBuildResult(result)
       setBuildLog(result.log || '')
+      setBuildSummary(null)
       setBuildState(result.status === 'ok' ? 'ok' : 'error')
       setStatus(result.status === 'ok'
         ? `Nordic 构建完成：${result.projectId?.slice(0, 8) || 'unknown'}`
         : 'Nordic 构建失败')
     } catch (error) {
       setBuildResult(error.result || null)
+      const summary = error.summary || summarizeNordicBuildFailure(error.result?.log || error.message)
+      setBuildSummary(summary)
       setBuildLog(error.result?.log || error.message)
       setBuildState('error')
-      setStatus(`Nordic 构建失败：${error.message}`)
+      setStatus(`Nordic 构建失败：${summary.title}`)
+    }
+  }
+
+  async function handleDfuFlash() {
+    setDfuState('running')
+    setDfuProgress(0)
+    setDfuLog('准备 Web Serial DFU...')
+    setStatus('正在通过浏览器串口烧录 Nordic 固件...')
+    try {
+      await flashNordicOverSerial({
+        artifact: dfuArtifact,
+        downloadArtifact: downloadNordicArtifact,
+        onLog: line => setDfuLog(prev => `${prev}${prev ? '\n' : ''}${line}`),
+        onProgress: value => setDfuProgress(value),
+      })
+      setDfuState('ok')
+      setStatus('Nordic Web Serial DFU 完成')
+    } catch (error) {
+      setDfuState('error')
+      setDfuLog(prev => `${prev}${prev ? '\n' : ''}${error.message}`)
+      setStatus(`Nordic 串口烧录失败：${error.message}`)
     }
   }
 
@@ -139,12 +179,53 @@ export default function NordicWorkspace({ onOpenSettings }) {
             <div className="nordic-artifacts">
               {buildResult.artifacts.map(artifact => (
                 <code key={artifact.relativePath}>
-                  {artifact.relativePath} · {(artifact.size / 1024).toFixed(1)} KB
+                  {artifact.relativePath} · {(artifact.size / 1024).toFixed(1)} KB{artifact.dfu ? ' · DFU' : ''}
                 </code>
               ))}
             </div>
           )}
-          {buildLog && <pre className="nordic-build-log">{buildLog}</pre>}
+          {buildSummary && (
+            <div className="nordic-build-summary">
+              <strong>{buildSummary.title}</strong>
+              {buildSummary.suggestion && <span>{buildSummary.suggestion}</span>}
+              {buildSummary.excerpt && <pre>{buildSummary.excerpt}</pre>}
+            </div>
+          )}
+          {buildLog && (
+            <>
+              {buildSummary && (
+                <button className="nordic-log-toggle" onClick={() => setShowFullBuildLog(prev => !prev)}>
+                  {showFullBuildLog ? '隐藏完整日志' : '展开完整日志'}
+                </button>
+              )}
+              {(!buildSummary || showFullBuildLog) && <pre className="nordic-build-log">{buildLog}</pre>}
+            </>
+          )}
+        </div>
+        <div className="nordic-dfu-panel">
+          <div className="nordic-heading">Web Serial DFU</div>
+          <div className="nordic-dfu-meta">
+            {dfuArtifact
+              ? `将烧录 ${dfuArtifact.name || dfuArtifact.relativePath}`
+              : '先服务器构建，生成 zephyr.signed.bin'}
+          </div>
+          <button
+            className="nordic-primary"
+            onClick={handleDfuFlash}
+            disabled={!dfuArtifact || Boolean(dfuUnavailable) || dfuState === 'running'}
+            title={dfuUnavailable || '通过 Chrome/Edge Web Serial 烧录 nRF'}
+          >
+            {dfuState === 'running' ? `烧录中 ${dfuProgress}%` : '串口烧录'}
+          </button>
+          <div className="nordic-dfu-progress" aria-label="Nordic DFU progress">
+            <span style={{ width: `${dfuProgress}%` }} />
+          </div>
+          <div className="nordic-dfu-note">
+            首次仍需 west flash 预烧 MCUboot；之后可用浏览器上传 zephyr.signed.bin。
+          </div>
+          {(dfuUnavailable || dfuLog) && (
+            <pre className="nordic-dfu-log">{dfuLog || dfuUnavailable}</pre>
+          )}
         </div>
         <div className="nordic-capability-list">
           <div className="nordic-heading">能力</div>
@@ -213,7 +294,7 @@ export default function NordicWorkspace({ onOpenSettings }) {
         </div>
         <div className="nordic-chat-body">
           <p>描述需求后会生成真实 Zephyr 工程文件，包含 CMake、prj.conf 和 src/main.c。</p>
-          <p>当前已接入服务器 west build；J-Link/nrfjprog 烧录和设备证据后续接入。</p>
+          <p>当前已接入服务器 west build 和浏览器 Web Serial DFU；首次预烧仍使用 west flash。</p>
           <div className="nordic-prompts">
             {QUICK_PROMPTS.map(item => (
               <button key={item} onClick={() => setPrompt(item)}>{item}</button>

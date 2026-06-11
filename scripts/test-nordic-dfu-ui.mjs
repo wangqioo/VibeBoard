@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const workspace = readFileSync(new URL('../src/components/NordicWorkspace.jsx', import.meta.url), 'utf8')
+const compiler = readFileSync(new URL('../src/utils/nordicCompiler.js', import.meta.url), 'utf8')
+const dfu = readFileSync(new URL('../src/utils/nordicDfu.js', import.meta.url), 'utf8')
+const styles = readFileSync(new URL('../src/components/NordicWorkspace.css', import.meta.url), 'utf8')
+
+assert.match(compiler, /export async function downloadNordicArtifact/)
+assert.match(dfu, /export async function flashNordicOverSerial/)
+assert.match(dfu, /navigator\.serial/)
+assert.match(dfu, /Web Serial/)
+assert.match(workspace, /flashNordicOverSerial/)
+assert.match(workspace, /selectNordicDfuArtifact/)
+assert.match(workspace, /downloadNordicArtifact/)
+assert.match(workspace, /async function handleDfuFlash\(\)/)
+assert.match(workspace, /dfuArtifact/)
+assert.match(workspace, /串口烧录/)
+assert.match(workspace, /Web Serial DFU/)
+assert.match(workspace, /nordic-dfu-panel/)
+assert.match(workspace, /nordic-dfu-log/)
+assert.match(styles, /\.nordic-dfu-panel\s*\{/)
+assert.match(styles, /\.nordic-dfu-progress\s*\{/)
+assert.match(styles, /\.nordic-dfu-log\s*\{/)
+
+console.log('nordic dfu UI tests passed')

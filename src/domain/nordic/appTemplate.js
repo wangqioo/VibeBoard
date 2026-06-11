@@ -27,6 +27,7 @@ export function createNordicAppFiles(config = {}) {
   return {
     'CMakeLists.txt': createCMakeLists(appName),
     'prj.conf': createPrjConf(capabilities),
+    'sysbuild.conf': createSysbuildConf(),
     'src/main.c': createMainC({ ...merged, appName, capabilities }),
     'README.md': createReadme({ ...merged, appName }),
   }
@@ -49,6 +50,20 @@ function createPrjConf(capabilities) {
     'CONFIG_UART_CONSOLE=y',
     'CONFIG_LOG=y',
     'CONFIG_PRINTK=y',
+    'CONFIG_NET_BUF=y',
+    'CONFIG_FLASH=y',
+    'CONFIG_BOOTLOADER_MCUBOOT=y',
+    'CONFIG_MCUMGR=y',
+    'CONFIG_MCUMGR_TRANSPORT_UART=y',
+    'CONFIG_MCUMGR_GRP_IMG=y',
+    'CONFIG_MCUMGR_GRP_OS=y',
+    'CONFIG_IMG_MANAGER=y',
+    'CONFIG_MCUBOOT_IMG_MANAGER=y',
+    'CONFIG_FLASH_MAP=y',
+    'CONFIG_STREAM_FLASH=y',
+    'CONFIG_BASE64=y',
+    'CONFIG_CRC=y',
+    'CONFIG_ZCBOR=y',
   ]
   if (capabilities.has('ble_peripheral')) {
     lines.push(
@@ -64,6 +79,11 @@ function createPrjConf(capabilities) {
   return `${[...new Set(lines)].join('\n')}\n`
 }
 
+function createSysbuildConf() {
+  return `SB_CONFIG_BOOTLOADER_MCUBOOT=y
+`
+}
+
 function createMainC({ displayName, description, capabilities }) {
   const hasBle = capabilities.has('ble_peripheral')
   const hasGpio = capabilities.has('gpio_led_button')
@@ -73,6 +93,7 @@ function createMainC({ displayName, description, capabilities }) {
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/dfu/mcuboot.h>
 ${hasBle ? '#include <zephyr/bluetooth/bluetooth.h>\n#include <zephyr/bluetooth/hci.h>' : ''}
 
 #define APP_NAME "${escapeCString(displayName)}"
@@ -85,6 +106,14 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(LED0_NODE, gpios, {0}
 static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, {0});
 ` : ''}
 ${hasBle ? `
+static const struct bt_data ad[] = {
+    BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+};
+
+static const struct bt_data sd[] = {
+    BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
+};
+
 static void nordic_ble_ready(int err)
 {
     if (err) {
@@ -92,7 +121,7 @@ static void nordic_ble_ready(int err)
         return;
     }
     printk("Bluetooth ready: %s\\n", CONFIG_BT_DEVICE_NAME);
-    err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, NULL, 0, NULL, 0);
+    err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
     if (err) {
         printk("Advertising failed: %d\\n", err);
         return;
@@ -103,6 +132,11 @@ static void nordic_ble_ready(int err)
 
 int main(void)
 {
+    int confirm_err = boot_write_img_confirmed();
+    if (confirm_err) {
+        printk("MCUboot image confirm skipped: %d\\n", confirm_err);
+    }
+
     printk("%s\\n", APP_NAME);
     printk("%s\\n", APP_DESCRIPTION);
     printk("Board: ${NORDIC_BOARD_PROFILE.boardTarget}\\n");
@@ -157,6 +191,13 @@ Flash:
 \`\`\`sh
 west flash
 \`\`\`
+
+Browser DFU:
+
+- Run \`west flash\` once to provision MCUboot and the MCUmgr serial endpoint.
+- After that first wired flash, build artifacts include \`zephyr.signed.bin\`.
+- VibeBoard can use Web Serial DFU to upload \`zephyr.signed.bin\`, mark it for test boot, and reset the board.
+- The generated app confirms itself on boot with \`boot_write_img_confirmed()\`, so the new image stays active after a successful start.
 `
 }
 

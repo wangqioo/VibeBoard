@@ -1,6 +1,6 @@
 import http from 'node:http'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
@@ -44,10 +44,11 @@ export function sanitizeNordicFilePath(path) {
   if (typeof path !== 'string' || path.startsWith('/') || path.includes('..')) {
     throw new Error(`Unsafe Nordic file path: ${path || ''}`)
   }
-  if (path === 'CMakeLists.txt' || path === 'prj.conf') return path
+  if (path === 'CMakeLists.txt' || path === 'prj.conf' || path === 'sysbuild.conf' || path === 'README.md') return path
   if (/^src\/[A-Za-z0-9_./-]+\.(?:c|cpp|h|hpp|S|s)$/.test(path)) return path
   if (/^boards\/[A-Za-z0-9_./-]+\.overlay$/.test(path)) return path
   if (/^child_image\/[A-Za-z0-9_./-]+\.(?:conf|overlay)$/.test(path)) return path
+  if (/^sysbuild\/[A-Za-z0-9_./-]+\.(?:conf|overlay)$/.test(path)) return path
   throw new Error(`Unsafe Nordic file path: ${path}`)
 }
 
@@ -114,7 +115,21 @@ function runCommand(command, args, options = {}) {
   })
 }
 
-function listArtifacts(buildDir) {
+export function createArtifactDownloadUrl(relativePath) {
+  return `/nordic/artifact?path=${encodeURIComponent(relativePath)}`
+}
+
+function classifyArtifact(name, relativePath) {
+  if (/zephyr\.signed\.bin$|app_update\.bin$/.test(relativePath)) {
+    return { role: 'dfu-image', dfu: true }
+  }
+  if (/merged\.hex$/.test(name)) {
+    return { role: 'initial-flash', dfu: false }
+  }
+  return { role: 'build-output', dfu: false }
+}
+
+export function listArtifacts(buildDir, buildBase = BUILD_BASE) {
   if (!existsSync(buildDir)) return []
   const artifacts = []
 
@@ -128,16 +143,35 @@ function listArtifacts(buildDir) {
         continue
       }
       if (!/\.(?:hex|bin|elf)$/.test(name)) continue
+      const relativePath = relative(buildBase, absolutePath)
+      const classification = classifyArtifact(name, relativePath)
       artifacts.push({
         name,
-        relativePath: relative(BUILD_BASE, absolutePath),
+        relativePath,
         size: stats.size,
+        ...classification,
+        url: createArtifactDownloadUrl(relativePath),
       })
     }
   }
 
   visit(buildDir)
   return artifacts
+}
+
+function resolveArtifactPath(relativePath, buildBase = BUILD_BASE) {
+  if (typeof relativePath !== 'string' || relativePath.startsWith('/') || relativePath.includes('..')) {
+    throw new Error('Unsafe artifact path')
+  }
+  const absolutePath = resolve(buildBase, relativePath)
+  const base = resolve(buildBase)
+  if (absolutePath !== base && !absolutePath.startsWith(`${base}/`)) {
+    throw new Error('Unsafe artifact path')
+  }
+  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
+    throw new Error('Artifact not found')
+  }
+  return absolutePath
 }
 
 async function compileNordicProject({ files, boardTarget }) {
@@ -195,6 +229,21 @@ async function handle(req, res) {
   try {
     if (req.method === 'GET' && url.pathname === '/nordic/health') {
       json(res, 200, healthPayload())
+      return
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/nordic/artifact') {
+      const artifactPath = resolveArtifactPath(url.searchParams.get('path') || '')
+      const stats = statSync(artifactPath)
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(stats.size),
+        'Content-Disposition': `attachment; filename="${artifactPath.split('/').pop() || 'artifact.bin'}"`,
+      })
+      if (req.method === 'HEAD') {
+        res.end()
+        return
+      }
+      createReadStream(artifactPath).pipe(res)
       return
     }
     if (req.method === 'POST' && url.pathname === '/nordic/compile') {

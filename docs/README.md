@@ -22,6 +22,7 @@ README short; add details here.
 - [USB flashing](./guides/flashing.md)
 - [OTA workflows](./guides/ota.md)
 - [Compiler service](./guides/compiler-service.md)
+- [Nordic nRF build and browser DFU](./guides/nordic.md)
 - [HTTPS USB flashing deployment](../deploy/HTTPS_USB_FLASH.md)
 
 ## Architecture And Product Notes

@@ -47,6 +47,7 @@
 .nordic-status,
 .nordic-command-box,
 .nordic-build-panel,
+.nordic-dfu-panel,
 .nordic-capability-list {
   border: 1px solid var(--border);
   background: var(--bg-primary);
@@ -83,6 +84,11 @@
 
 .nordic-build-panel {
   display: block;
+}
+
+.nordic-dfu-panel {
+  display: grid;
+  gap: 8px;
 }
 
 .nordic-capability {
@@ -152,6 +158,86 @@
 .nordic-build-log {
   max-height: 140px;
   margin: 10px 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.nordic-build-summary {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--bg-secondary);
+}
+
+.nordic-build-summary strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.nordic-build-summary span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.nordic-build-summary pre {
+  max-height: 90px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.nordic-log-toggle {
+  width: 100%;
+  min-height: 30px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.nordic-dfu-meta,
+.nordic-dfu-note {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.nordic-dfu-progress {
+  height: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+}
+
+.nordic-dfu-progress span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  background: var(--accent);
+  transition: width 160ms ease;
+}
+
+.nordic-dfu-log {
+  max-height: 100px;
+  margin: 0;
   overflow: auto;
   white-space: pre-wrap;
   color: var(--text-secondary);

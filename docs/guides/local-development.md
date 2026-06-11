@@ -95,6 +95,8 @@ npm run test:nordic-app-template
 npm run test:nordic-workspace-ui
 npm run test:nordic-compiler-service
 npm run test:nordic-compiler-service-config
+npm run test:nordic-dfu-protocol
+npm run test:nordic-dfu-ui
 ```
 
 Build the browser app:
