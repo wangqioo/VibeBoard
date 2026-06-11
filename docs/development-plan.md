@@ -298,6 +298,9 @@ running MCUboot + MCUmgr.
   - `CMakeLists.txt`
   - `prj.conf`
   - `sysbuild.conf`
+  - `boards/xiao_ble.overlay`
+  - `sysbuild/mcuboot/prj.conf`
+  - `sysbuild/mcuboot/boards/xiao_ble.overlay`
   - `src/main.c`
   - `README.md`
 - Added MCUboot and MCUmgr serial DFU configuration to generated nRF projects:
@@ -317,6 +320,9 @@ running MCUboot + MCUmgr.
   - `CONFIG_ZCBOR=y`
 - Added server artifact discovery and download for Nordic build outputs.
   `zephyr.signed.bin` is marked as the DFU image.
+- Added UF2 artifact support. The UI now exposes a separate UF2 download path
+  for XIAO first-time flashing or recovery, and prefers the application
+  `zephyr.uf2` over the MCUboot `zephyr.uf2` when both artifacts exist.
 - Added browser-side Nordic Web Serial DFU modules:
   - `src/utils/nordicDfuProtocol.js`
   - `src/utils/nordicDfu.js`
@@ -355,6 +361,25 @@ dfu: true
 - Frontend static deployment on `esp32-vibe-coder` was updated after the BLE
   template fix. The deployed JS bundle no longer contains the old
   `BT_LE_ADV_CONN_NAME` macro and does contain `BT_LE_ADV_CONN_FAST_1`.
+- On 2026-06-12, real server-side `west build` for `xiao_ble` succeeded after
+  adding XIAO-specific MCUboot partition overlays for both the app image and the
+  MCUboot sysbuild image.
+- That successful XIAO build produced:
+  - application `zephyr.uf2`
+  - application `zephyr.signed.bin`
+  - `merged.hex`
+  - MCUboot build artifacts
+- The deployed frontend was updated through the `esp32-vibe-coder` nginx
+  container and verified from the server side:
+  - latest confirmed bundle during the PRINTK/Kconfig fix:
+    `index-tENREsbV.js`
+  - `http://127.0.0.1:4100/nordic/health` returned `status: ok`
+- GitHub commits currently carrying the Nordic work:
+  - `480f9a9 Make Nordic workspace target XIAO and real AI generation`
+  - `df8e91b Add Nordic UF2 download path alongside MCUmgr`
+  - `66eefe5 Fix XIAO Nordic MCUboot partition build`
+  - `84bff75 Prefer application UF2 for Nordic downloads`
+  - `79589b7 Guard Nordic AI against PRINTK Kconfig conflicts`
 
 ### Important Findings
 
@@ -380,10 +405,27 @@ http://localhost:4100/
   - `BT_LE_ADV_CONN_FAST_1`
   - `BT_DATA_NAME_COMPLETE`
   - explicit advertising and scan-response arrays.
+- Seeed XIAO nRF52840's default Zephyr board DTS uses a UF2/SoftDevice-style
+  partition map with `code_partition`, not MCUboot `slot0_partition` /
+  `slot1_partition`. MCUboot sysbuild needs those slot labels, so VibeBoard now
+  generates a XIAO-specific MCUboot partition overlay in both:
+  - `boards/xiao_ble.overlay`
+  - `sysbuild/mcuboot/boards/xiao_ble.overlay`
+- If `sysbuild/mcuboot/boards/xiao_ble.overlay` exists, Zephyr also expects a
+  `sysbuild/mcuboot/prj.conf`. VibeBoard now generates a minimal MCUboot config
+  there.
+- MCUboot's child image should keep console/serial output disabled on XIAO to
+  avoid a UART console link failure, but the application image must keep
+  `CONFIG_PRINTK`, `CONFIG_CONSOLE`, `CONFIG_SERIAL`, and `CONFIG_UART_CONSOLE`
+  enabled. The AI validation now rejects application `prj.conf` files that set
+  those symbols to `n`.
+- Kconfig warning summaries now keep the complete assigned/got message instead
+  of truncating after `was assigned the value`.
 
 ### Known Gaps
 
 - Full real-board browser DFU has not been completed yet.
+- Real-board UF2 first flashing has not been completed yet in this session.
 - The connected board appeared locally as `/dev/cu.usbmodem1101`, but the
   Web Serial upload result was not captured before pausing.
 - The Mac does not currently have `nrfjprog`, `JLinkExe`, `mcumgr`, or
@@ -401,27 +443,33 @@ Cmd + Shift + R
    `http://localhost:4100/`.
 2. Hard-refresh the browser page.
 3. Confirm the Nordic page builds a project and shows a `zephyr.signed.bin`
-   DFU artifact.
-4. Click `串口烧录` and choose the board serial port, expected on this Mac as
+   DFU artifact and an application `zephyr.uf2` artifact.
+4. First-time or recovery path: double-reset the Seeed XIAO nRF52840 into UF2
+   mass-storage mode, download the application `zephyr.uf2`, and drag it to the
+   XIAO drive.
+5. Confirm the board boots the VibeBoard-generated firmware. Capture serial
+   logs if possible.
+6. Follow-up update path: click `串口烧录` and choose the board serial port,
+   expected on this Mac as
    `/dev/cu.usbmodem1101`.
-5. Capture the exact Web Serial DFU log:
+7. Capture the exact Web Serial DFU log:
    - port open
    - artifact download
    - upload offset/progress
    - image test state
    - reset command
-6. If DFU fails, classify the failure:
+8. If DFU fails, classify the failure:
    - browser cannot open serial
    - serial opens but no MCUmgr response
    - upload offset stalls
    - image state/test fails
    - reset fails
    - board reboots but does not run the new image
-7. If recovery is needed, install or locate local tools for the Mac:
+9. If recovery is needed, install or locate local tools for the Mac:
    - Nordic Command Line Tools / `nrfjprog`
    - SEGGER J-Link / `JLinkExe`
    - `mcumgr` or `nrfutil`
-8. After real-board DFU succeeds, add a short guide under `docs/guides/` for
+10. After real-board DFU succeeds, add a short guide under `docs/guides/` for
    Nordic provisioning and browser DFU.
 
 ## Near-Term Execution Queue

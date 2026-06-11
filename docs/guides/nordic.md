@@ -1,7 +1,8 @@
 # Nordic nRF Build And Browser DFU
 
-This guide records the current Nordic nRF path. It is not yet a fully proven
-production flow; the next step is a real-board Web Serial DFU run.
+This guide records the current Nordic nRF path. Server-side build for Seeed
+XIAO nRF52840 is proven; the remaining proof is real-board UF2 first flashing
+and browser Web Serial MCUmgr update.
 
 ## Current Architecture
 
@@ -89,11 +90,15 @@ Generated files:
 CMakeLists.txt
 prj.conf
 sysbuild.conf
+boards/xiao_ble.overlay
+sysbuild/mcuboot/prj.conf
+sysbuild/mcuboot/boards/xiao_ble.overlay
 src/main.c
 README.md
 ```
 
-The template enables MCUboot and MCUmgr serial DFU. Important config:
+The template enables MCUboot, MCUmgr serial DFU, and UF2 output. Important app
+config:
 
 ```text
 SB_CONFIG_BOOTLOADER_MCUBOOT=y
@@ -110,6 +115,11 @@ CONFIG_STREAM_FLASH=y
 CONFIG_BASE64=y
 CONFIG_CRC=y
 CONFIG_ZCBOR=y
+CONFIG_BUILD_OUTPUT_UF2=y
+CONFIG_PRINTK=y
+CONFIG_CONSOLE=y
+CONFIG_SERIAL=y
+CONFIG_UART_CONSOLE=y
 ```
 
 The generated app calls:
@@ -120,9 +130,31 @@ boot_write_img_confirmed();
 
 This lets a test-booted image confirm itself after a successful boot.
 
+The XIAO target also needs MCUboot partition overlays because the default Zephyr
+board DTS uses a UF2/SoftDevice-style `code_partition`, while MCUboot sysbuild
+needs `slot0_partition` and `slot1_partition`. VibeBoard generates matching
+overlays for both the app image and the MCUboot child image.
+
+The MCUboot child image intentionally keeps console/serial/printk disabled on
+XIAO to avoid UART console link failures. The application image must not disable
+`CONFIG_PRINTK`, `CONFIG_CONSOLE`, `CONFIG_SERIAL`, or `CONFIG_UART_CONSOLE`;
+the AI validation rejects generated app `prj.conf` files that set those symbols
+to `n`.
+
 ## Artifact Contract
 
-Successful Nordic builds return artifacts. The browser DFU path should choose:
+Successful Nordic builds return several artifacts. For Seeed XIAO nRF52840
+first-time flashing or recovery, use the application UF2:
+
+```text
+zephyr.uf2
+```
+
+If both application and MCUboot UF2 files exist, choose the application artifact,
+not `build/mcuboot/zephyr/zephyr.uf2`. The UI selector is expected to prefer the
+application UF2 automatically.
+
+For browser MCUmgr updates after the board already runs VibeBoard firmware, use:
 
 ```text
 zephyr.signed.bin
@@ -143,8 +175,8 @@ The initial wired/factory flashing artifact is:
 merged.hex
 ```
 
-That artifact is useful for `west flash`, J-Link, or another trusted first-time
-provisioning path. It is not what the browser serial DFU uploads.
+That artifact is useful for `west flash`, J-Link, or another trusted factory
+flash path. It is not what the browser serial DFU uploads.
 
 ## Build Failure Display
 
@@ -155,7 +187,7 @@ Examples:
 
 ```text
 src/main.c:27: 'BT_LE_ADV_CONN_NAME' undeclared
-Kconfig 配置不满足：MCUMGR_GRP_IMG was assigned the value
+Kconfig 配置不满足：PRINTK was assigned the value 'y' but got the value 'n'
 CMake 配置失败：/path/to/kconfig.cmake:409
 ```
 
@@ -209,8 +241,8 @@ Line Tools, SEGGER J-Link, or an MCUmgr client is installed or located.
 
 ## Verified So Far
 
-- Server-side real `west build` succeeds for the default BLE/GPIO/UART Nordic
-  template on the deployed NCS v3.3.1 / Zephyr 4.3.99 toolchain.
+- Server-side real `west build` succeeds for Seeed XIAO nRF52840 / `xiao_ble`
+  on the deployed NCS v3.3.1 / Zephyr 4.3.99 toolchain.
 - The BLE template was fixed for Zephyr 4.3.99 by replacing the old
   `BT_LE_ADV_CONN_NAME` usage with the sample-compatible pattern:
 
@@ -222,22 +254,30 @@ explicit advertising and scan-response arrays
 
 - The deployed frontend bundle was rebuilt and confirmed to contain
   `BT_LE_ADV_CONN_FAST_1`, not `BT_LE_ADV_CONN_NAME`.
-- The service returns a `zephyr.signed.bin` DFU artifact for successful builds.
-- The artifact download route returns the expected signed image bytes.
+- The service returns application `zephyr.uf2`, application
+  `zephyr.signed.bin`, `merged.hex`, and MCUboot artifacts for successful XIAO
+  builds.
+- The UI prefers application `zephyr.uf2` for UF2 download and
+  `zephyr.signed.bin` for browser MCUmgr DFU.
+- The AI validation rejects app `prj.conf` files that disable `CONFIG_PRINTK`,
+  `CONFIG_CONSOLE`, `CONFIG_SERIAL`, or `CONFIG_UART_CONSOLE`.
+- The deployed frontend bundle was confirmed during the PRINTK/Kconfig fix as
+  `index-tENREsbV.js`.
 
 ## Not Yet Verified
 
-- Browser Web Serial upload to the real board.
+- Real-board UF2 first flashing by dragging application `zephyr.uf2` onto the
+  XIAO bootloader drive.
+- Browser Web Serial upload to the real board after UF2 provisioning.
 - MCUmgr response parsing against the real board.
 - Image upload offset progression.
 - Image test-state command.
 - Reset command.
 - New image boot and self-confirm.
-- Seeed XIAO nRF52840 first provisioning. A timeout like
-  `等待 MCUmgr 响应超时` means the browser opened the serial port but the
-  currently running firmware did not answer MCUmgr/SMP serial packets. The usual
-  fix is to flash the generated `merged.hex` once with a non-browser path, then
-  use browser DFU for later `zephyr.signed.bin` updates.
+- A timeout like `等待 MCUmgr 响应超时` means the browser opened the serial port
+  but the currently running firmware did not answer MCUmgr/SMP serial packets.
+  For XIAO, first try UF2 first flashing with application `zephyr.uf2`; then use
+  browser DFU for later `zephyr.signed.bin` updates.
 
 ## Next Real-Board Test
 
@@ -262,18 +302,25 @@ http://localhost:4100/
 6. Confirm the build output includes:
 
 ```text
+zephyr.uf2
 zephyr.signed.bin · DFU
 ```
 
-7. Click `串口烧录`.
+7. For first flashing or recovery, double-reset the XIAO into UF2 mass-storage
+   mode and drag the downloaded application `zephyr.uf2` onto the XIAO drive.
 
-8. In the browser serial chooser, select the port corresponding to:
+8. Confirm the board boots the VibeBoard-generated firmware. Capture serial logs
+   if possible.
+
+9. For follow-up updates, click `串口烧录`.
+
+10. In the browser serial chooser, select the port corresponding to:
 
 ```text
 /dev/cu.usbmodem1101
 ```
 
-9. Capture the full DFU log. Classify any failure as one of:
+11. Capture the full DFU log. Classify any failure as one of:
 
 ```text
 browser cannot open serial
@@ -285,7 +332,7 @@ board reboots but old image stays active
 board reboots and disappears from USB
 ```
 
-10. If browser DFU fails and command-line probing is needed, install or locate:
+12. If browser DFU fails and command-line probing is needed, install or locate:
 
 ```text
 nrfjprog
@@ -300,6 +347,8 @@ Run these after Nordic changes:
 
 ```bash
 npm run test:nordic-app-template
+npm run test:nordic-ai-generation
+npm run test:nordic-build-log-summary
 npm run test:nordic-workspace-ui
 npm run test:nordic-compiler-service
 npm run test:nordic-compiler-service-config
