@@ -120,6 +120,8 @@ CONFIG_PRINTK=y
 CONFIG_CONSOLE=y
 CONFIG_SERIAL=y
 CONFIG_UART_CONSOLE=y
+CONFIG_USB_DEVICE_STACK_NEXT=y
+CONFIG_CDC_ACM_SERIAL_INITIALIZE_AT_BOOT=y
 ```
 
 The generated app calls:
@@ -130,10 +132,18 @@ boot_write_img_confirmed();
 
 This lets a test-booted image confirm itself after a successful boot.
 
-The XIAO target also needs MCUboot partition overlays because the default Zephyr
-board DTS uses a UF2/SoftDevice-style `code_partition`, while MCUboot sysbuild
-needs `slot0_partition` and `slot1_partition`. VibeBoard generates matching
-overlays for both the app image and the MCUboot child image.
+The XIAO target also needs partition overlays because the default Zephyr board
+DTS uses a UF2/SoftDevice-style `code_partition`, while MCUboot sysbuild needs
+`slot0_partition` and `slot1_partition`. VibeBoard generates a USB CDC +
+partition overlay for the app image and a partition-only overlay for the MCUboot
+child image. The compiler service passes the child overlay explicitly with
+`mcuboot_EXTRA_DTC_OVERLAY_FILE` and the app overlay explicitly with
+`DTC_OVERLAY_FILE` so sysbuild does not silently fall back to the stock Seeed UF2
+partitions.
+
+The app overlay routes `zephyr,console`, `zephyr,shell-uart`, and
+`zephyr,uart-mcumgr` to `board_cdc_acm_uart`. This keeps browser Web Serial DFU
+on the same USB CDC channel used for logs.
 
 The MCUboot child image intentionally keeps console/serial/printk disabled on
 XIAO to avoid UART console link failures. The application image must not disable
@@ -224,8 +234,39 @@ generated code to the compiler service.
 Observed on the Mac:
 
 ```text
-/dev/cu.usbmodem1101
+/dev/cu.usbmodem112301
 ```
+
+As of 2026-06-13, that serial device maps to an Espressif
+`USB JTAG/serial debug unit`, not the XIAO nRF52840. No Nordic, Seeed, XIAO, or
+UF2 bootloader device was visible in the USB device tree, and no UF2 volume was
+mounted under `/Volumes`.
+
+The current XIAO-ready artifacts have been copied to the local checkout:
+
+```text
+outputs/nordic/xiao-vibeboard-20260613-zephyr.uf2
+outputs/nordic/xiao-vibeboard-20260613-zephyr.signed.bin
+outputs/nordic/xiao-vibeboard-20260613-merged.hex
+outputs/nordic/xiao-vibeboard-stock-uf2-smoke-20260613-zephyr.uf2
+outputs/nordic/xiao-vibeboard-usb-console-smoke-20260613-zephyr.uf2
+```
+
+The MCUboot/sysbuild application UF2 starts at `0xc000`. Dragging that artifact
+onto the stock `XIAO-SENSE` UF2 bootloader disk returned the board to the
+bootloader, so it is not a valid factory first-flash path for a board that still
+runs the Seeed UF2 bootloader.
+
+A stock Zephyr UF2 smoke build for `xiao_ble/nrf52840/sense` starts at
+`0x27000`. Dragging that UF2 onto `XIAO-SENSE` succeeded and the bootloader
+volume disappeared, which proves the board accepts VibeBoard-built stock UF2
+applications. That smoke app did not expose USB console logs.
+
+The USB-console smoke UF2 was also copied to `XIAO-SENSE` successfully. The
+bootloader volume disappeared afterward, but macOS did not enumerate a new
+Seeed/XIAO/Nordic USB CDC serial device. The only visible `usbmodem` device was
+the unrelated Espressif JTAG serial unit above, so heartbeat log capture is not
+yet proven.
 
 Local tools currently missing from `PATH`:
 
@@ -257,6 +298,15 @@ explicit advertising and scan-response arrays
 - The service returns application `zephyr.uf2`, application
   `zephyr.signed.bin`, `merged.hex`, and MCUboot artifacts for successful XIAO
   builds.
+- A live service compile on 2026-06-13 returned application `zephyr.uf2`
+  (`358912` bytes), application `zephyr.signed.bin` (`179967` bytes), and
+  `merged.hex` for project `19cac6ac-1f00-4e00-ae7d-e5bd67760eae`.
+- A manual real `west build` on 2026-06-13 with explicit `DTC_OVERLAY_FILE` and
+  `mcuboot_EXTRA_DTC_OVERLAY_FILE` loaded both overlays, routed app
+  `zephyr,console`, `zephyr,shell-uart`, and `zephyr,uart-mcumgr` to
+  `board_cdc_acm_uart`, and produced application `zephyr.uf2` (`362496` bytes),
+  application `zephyr.signed.bin` (`181856` bytes), and `merged.hex`
+  (`617350` bytes).
 - The UI prefers application `zephyr.uf2` for UF2 download and
   `zephyr.signed.bin` for browser MCUmgr DFU.
 - The AI validation rejects app `prj.conf` files that disable `CONFIG_PRINTK`,
@@ -268,6 +318,8 @@ explicit advertising and scan-response arrays
 
 - Real-board UF2 first flashing by dragging application `zephyr.uf2` onto the
   XIAO bootloader drive.
+- USB-console smoke UF2 log capture, after the XIAO enumerates a Nordic/Seeed
+  USB CDC serial device.
 - Browser Web Serial upload to the real board after UF2 provisioning.
 - MCUmgr response parsing against the real board.
 - Image upload offset progression.

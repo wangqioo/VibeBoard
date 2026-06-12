@@ -2,16 +2,24 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const appSource = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8')
+const chatPanel = await readFile(new URL('../src/components/ChatPanel.jsx', import.meta.url), 'utf8')
 const appCss = await readFile(new URL('../src/App.css', import.meta.url), 'utf8')
 const indexCss = await readFile(new URL('../src/index.css', import.meta.url), 'utf8')
 
 assert.match(appSource, /VibeBoard Micro/)
 assert.match(appSource, /AI Hardware Workbench/)
-assert.match(appSource, /生成 \/ 编译 \/ 烧录 \/ 设备证据/)
+assert.match(appSource, /生成 \/ 编译 \/ 修复 \/ 烧录 \/ 设备证据/)
 assert.match(appSource, /AI 工作流/)
 assert.match(appSource, /设备证据/)
 assert.doesNotMatch(appSource, /ESP32 Vibe Coder/)
 assert.doesNotMatch(appSource, /🤖|📟|⚙/)
+
+assert.match(chatPanel, /AI 硬件工作流/)
+assert.match(chatPanel, /'生成并编译'/)
+assert.match(chatPanel, /AI 只写\s*<code>main\/<\/code>\s*应用源码/)
+assert.match(chatPanel, /系统配置由 VibeBoard 生成/)
+assert.doesNotMatch(chatPanel, /<span>AI 代码助手<\/span>/)
+assert.doesNotMatch(chatPanel, /:\s*'生成代码'/)
 
 assert.match(indexCss, /--accent:\s*#38bdf8/)
 assert.match(indexCss, /--accent-hover:\s*#7dd3fc/)

@@ -925,7 +925,7 @@ export default function ChatPanel({
       <div className="chat-header">
         <div className="chat-title">
           <span className="chat-icon">🤖</span>
-          <span>AI 代码助手</span>
+          <span>AI 硬件工作流</span>
         </div>
         <div className="chat-header-actions">
           {messages.length > 0 && (
@@ -1029,7 +1029,7 @@ export default function ChatPanel({
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasConfig ? '描述你需要的功能，AI 会结合开发板硬件信息生成代码...' : '请先配置 API Key'}
+            placeholder={hasConfig ? '描述你需要的硬件功能，AI 会生成 main/ 应用源码并自动编译...' : '请先配置 API Key'}
             disabled={!hasConfig || streaming || generating}
             rows={3}
           />
@@ -1038,7 +1038,7 @@ export default function ChatPanel({
             onClick={() => generateCodeFromInput()}
             disabled={!hasConfig || streaming || generating || !input.trim()}
           >
-            {generating ? '生成中' : '生成代码'}
+            {generating ? '生成中' : '生成并编译'}
           </button>
           <button
             className={`send-btn ${streaming ? 'stop' : ''}`}
@@ -1048,7 +1048,9 @@ export default function ChatPanel({
             {streaming ? '■ 停止' : '解释'}
           </button>
         </div>
-        <div className="chat-input-hint">生成代码会写入左侧应用文件 · 解释只聊天不改项目</div>
+        <div className="chat-input-hint">
+          AI 只写 <code>main/</code> 应用源码 · 系统配置由 VibeBoard 生成 · 解释只聊天不改项目
+        </div>
       </div>
     </div>
   )

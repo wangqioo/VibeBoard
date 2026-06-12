@@ -4,12 +4,20 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   createArtifactDownloadUrl,
+  createServer,
+  createWestBuildArgs,
   healthPayload,
   listArtifacts,
   normalizeBoardTarget,
   sanitizeNordicFilePath,
   writeNordicProject,
 } from '../backend/nordic-compiler-service/server.mjs'
+
+const minimalNordicFiles = {
+  'CMakeLists.txt': 'cmake_minimum_required(VERSION 3.20.0)\nfind_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})\nproject(test)\ntarget_sources(app PRIVATE src/main.c)\n',
+  'prj.conf': 'CONFIG_GPIO=y\n',
+  'src/main.c': '#include <zephyr/kernel.h>\nint main(void) { return 0; }\n',
+}
 
 assert.equal(sanitizeNordicFilePath('CMakeLists.txt'), 'CMakeLists.txt')
 assert.equal(sanitizeNordicFilePath('prj.conf'), 'prj.conf')
@@ -26,16 +34,18 @@ assert.equal(normalizeBoardTarget('nrf52840dk/nrf52840'), 'nrf52840dk/nrf52840')
 assert.equal(normalizeBoardTarget('xiao_ble'), 'xiao_ble')
 assert.equal(normalizeBoardTarget('xiao_ble/nrf52840/sense'), 'xiao_ble/nrf52840/sense')
 assert.throws(() => normalizeBoardTarget('nrf52840dk/nrf52840; rm -rf /'), /Unsafe Nordic board target/)
+assert.throws(
+  () => normalizeBoardTarget('native_posix'),
+  /Unsupported Nordic board target: native_posix\. Supported targets: xiao_ble, xiao_ble\/nrf52840\/sense, nrf52840dk\/nrf52840/,
+)
 
 const workspace = mkdtempSync(join(tmpdir(), 'nordic-compiler-service-'))
 try {
   const payload = {
     boardTarget: 'xiao_ble',
     files: {
-      'CMakeLists.txt': 'cmake_minimum_required(VERSION 3.20.0)\nfind_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})\nproject(test)\ntarget_sources(app PRIVATE src/main.c)\n',
-      'prj.conf': 'CONFIG_GPIO=y\n',
+      ...minimalNordicFiles,
       'sysbuild.conf': 'SB_CONFIG_BOOTLOADER_MCUBOOT=y\n',
-      'src/main.c': '#include <zephyr/kernel.h>\nint main(void) { return 0; }\n',
     },
   }
   const project = writeNordicProject({ buildBase: workspace, ...payload })
@@ -44,6 +54,26 @@ try {
   assert.ok(project.writtenFiles.includes('prj.conf'))
   assert.ok(project.writtenFiles.includes('sysbuild.conf'))
   assert.ok(project.writtenFiles.includes('src/main.c'))
+  assert.deepEqual(createWestBuildArgs(project), ['build', '-b', 'xiao_ble', '.', '-d', 'build'])
+  const overlayProject = writeNordicProject({
+    buildBase: workspace,
+    boardTarget: 'xiao_ble',
+    files: {
+      ...payload.files,
+      'boards/xiao_ble.overlay': '/ { chosen { zephyr,code-partition = &slot0_partition; }; };\n',
+      'sysbuild/mcuboot/boards/xiao_ble.overlay': '/ { chosen { zephyr,code-partition = &slot0_partition; }; };\n',
+    },
+  })
+  const overlayArgs = createWestBuildArgs(overlayProject)
+  assert.ok(overlayArgs.includes('--'))
+  assert.ok(overlayArgs.some(arg => (
+    arg.startsWith('-DDTC_OVERLAY_FILE=') &&
+    arg.endsWith('boards/xiao_ble.overlay')
+  )))
+  assert.ok(overlayArgs.some(arg => (
+    arg.startsWith('-Dmcuboot_EXTRA_DTC_OVERLAY_FILE=') &&
+    arg.endsWith('sysbuild/mcuboot/boards/xiao_ble.overlay')
+  )))
   const missingMain = { ...payload.files }
   delete missingMain['src/main.c']
   assert.throws(
@@ -78,6 +108,28 @@ try {
   assert.equal(artifacts.find(artifact => artifact.name === 'merged.hex').role, 'initial-flash')
 } finally {
   rmSync(artifactsWorkspace, { recursive: true, force: true })
+}
+
+const server = createServer()
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+try {
+  const { port } = server.address()
+  const response = await fetch(`http://127.0.0.1:${port}/nordic/compile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      boardTarget: 'native_posix',
+      files: minimalNordicFiles,
+    }),
+  })
+  const body = await response.json()
+  assert.equal(response.status, 400)
+  assert.match(
+    body.error,
+    /Unsupported Nordic board target: native_posix\. Supported targets: xiao_ble, xiao_ble\/nrf52840\/sense, nrf52840dk\/nrf52840/,
+  )
+} finally {
+  await new Promise(resolve => server.close(resolve))
 }
 
 const health = healthPayload()

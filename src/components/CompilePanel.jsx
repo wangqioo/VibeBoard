@@ -317,11 +317,8 @@ export default function CompilePanel({
       })
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'wifi-ota',
-        status: 'success',
         message: '固件推送成功，设备正在重启...',
-        firmwareSize: firmware.size,
-        progress: 100,
-        deliveryResult: { ip: otaIp },
+        deliveryResult: { status: 'success', ip: otaIp, firmwareSize: firmware.size, progress: 100 },
         deviceInfo,
       }))
       setStatus('固件推送成功，设备正在重启...')
@@ -330,11 +327,7 @@ export default function CompilePanel({
     } catch (e) {
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'wifi-ota',
-        status: 'failure',
-        message: e.message,
-        firmwareSize: firmware.size,
-        progress: otaProgress,
-        deliveryResult: { ip: otaIp },
+        deliveryResult: { status: 'failure', error: e.message, ip: otaIp, firmwareSize: firmware.size, progress: otaProgress },
         deviceInfo,
       }))
       setErrorLog(e.message)
@@ -366,11 +359,8 @@ export default function CompilePanel({
       })
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'ble-ota',
-        status: 'success',
         message: 'BLE 烧录成功，设备正在重启...',
-        firmwareSize: firmware.size,
-        progress: 100,
-        deliveryResult: { deviceName: session.deviceName },
+        deliveryResult: { status: 'success', deviceName: session.deviceName, firmwareSize: firmware.size, progress: 100 },
         deviceInfo: { name: session.deviceName },
       }))
       setStatus('BLE 烧录成功，设备正在重启...')
@@ -378,11 +368,7 @@ export default function CompilePanel({
     } catch (e) {
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'ble-ota',
-        status: 'failure',
-        message: e.message,
-        firmwareSize: firmware.size,
-        progress: bleProgress,
-        deliveryResult: { deviceName: session?.deviceName },
+        deliveryResult: { status: 'failure', error: e.message, deviceName: session?.deviceName, firmwareSize: firmware.size, progress: bleProgress },
         deviceInfo: session?.deviceName ? { name: session.deviceName } : null,
       }))
       setErrorLog(e.message)
@@ -422,22 +408,15 @@ export default function CompilePanel({
       })
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'usb',
-        status: 'success',
         message: 'USB 烧录完成，设备已复位',
-        firmwareSize: firmware.size,
-        progress: 100,
-        deliveryResult: { automatic },
+        deliveryResult: { status: 'success', automatic, firmwareSize: firmware.size, progress: 100 },
       }))
       setStatus('USB 烧录完成，设备已复位')
       setUsbState('ok')
     } catch (e) {
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'usb',
-        status: 'failure',
-        message: e.message,
-        firmwareSize: firmware.size,
-        progress: usbProgress,
-        deliveryResult: { automatic },
+        deliveryResult: { status: 'failure', error: e.message, automatic, firmwareSize: firmware.size, progress: usbProgress },
       }))
       setErrorLog(e.message)
       setStatus('USB 烧录失败')
@@ -486,10 +465,12 @@ export default function CompilePanel({
       setRemoteState('error')
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'remote-ota',
-        status: 'failure',
-        message: '远程设备当前不在线。设备心跳每 10 秒一次，30 秒内没有心跳就不会下发 OTA。',
-        firmwareSize: firmware.size,
-        deliveryResult: { deviceId: remoteDeviceId },
+        deliveryResult: {
+          status: 'failure',
+          error: '远程设备当前不在线。设备心跳每 10 秒一次，30 秒内没有心跳就不会下发 OTA。',
+          deviceId: remoteDeviceId,
+          firmwareSize: firmware.size,
+        },
         deviceInfo: selectedDevice || { deviceId: remoteDeviceId },
       }))
       setErrorLog('远程设备当前不在线。设备心跳每 10 秒一次，30 秒内没有心跳就不会下发 OTA。')
@@ -509,10 +490,8 @@ export default function CompilePanel({
       })
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'remote-ota',
-        status: 'queued',
         message: '远程 OTA 已下发，等待设备领取',
-        firmwareSize: firmware.size,
-        deliveryResult: job,
+        deliveryResult: { ...job, firmwareSize: firmware.size },
         deviceInfo: selectedDevice || { deviceId: remoteDeviceId },
       }))
       setRemoteJob(job)
@@ -521,10 +500,7 @@ export default function CompilePanel({
     } catch (e) {
       onDeviceEvidence?.(createDeliveryDeviceEvidence({
         transport: 'remote-ota',
-        status: 'failure',
-        message: e.message,
-        firmwareSize: firmware.size,
-        deliveryResult: { deviceId: remoteDeviceId },
+        deliveryResult: { status: 'failure', error: e.message, deviceId: remoteDeviceId, firmwareSize: firmware.size },
         deviceInfo: selectedDevice || { deviceId: remoteDeviceId },
       }))
       setErrorLog(e.message)
@@ -544,10 +520,8 @@ export default function CompilePanel({
         if (job.status === 'done' || job.status === 'flashed' || job.status === 'rebooting') {
           onDeviceEvidence?.(createDeliveryDeviceEvidence({
             transport: 'remote-ota',
-            status: 'success',
             message: `远程 OTA 状态：${job.status}`,
-            firmwareSize: firmware?.size || null,
-            deliveryResult: job,
+            deliveryResult: { ...job, firmwareSize: firmware?.size || null },
             deviceInfo: remoteDevices.find(device => device.deviceId === job.deviceId) || { deviceId: job.deviceId },
           }))
           setRemoteState('done')
@@ -555,10 +529,7 @@ export default function CompilePanel({
         } else if (job.status === 'failed') {
           onDeviceEvidence?.(createDeliveryDeviceEvidence({
             transport: 'remote-ota',
-            status: 'failure',
-            message: job.error || '远程 OTA 失败',
-            firmwareSize: firmware?.size || null,
-            deliveryResult: job,
+            deliveryResult: { ...job, status: 'failure', error: job.error || '远程 OTA 失败', firmwareSize: firmware?.size || null },
             deviceInfo: remoteDevices.find(device => device.deviceId === job.deviceId) || { deviceId: job.deviceId },
           }))
           setRemoteState('error')
@@ -608,7 +579,7 @@ export default function CompilePanel({
     <div className="compile-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="compile-panel">
         <div className="compile-header">
-          <span className="compile-title">⚙ 编译 & 烧录</span>
+          <span className="compile-title">编译、烧录与证据</span>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
@@ -884,8 +855,8 @@ export default function CompilePanel({
             </div>
           )}
           {buildState === 'error' && buildEvidence && buildEvidenceRows.length > 0 && (
-            <section className="build-evidence-panel" aria-label="Build Evidence">
-              <div className="build-evidence-title">Build Evidence</div>
+            <section className="build-evidence-panel" aria-label="编译证据">
+              <div className="build-evidence-title">编译证据</div>
               <dl className="build-evidence-grid">
                 {buildEvidenceRows.map(row => (
                   <div className="build-evidence-row" key={row.label}>

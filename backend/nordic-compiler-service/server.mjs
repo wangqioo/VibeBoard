@@ -8,6 +8,7 @@ const PORT = Number(process.env.NORDIC_COMPILER_PORT || 8772)
 const BUILD_BASE = process.env.NORDIC_BUILD_BASE || '/tmp/nordic-builds'
 const SELF_TEST_MODE = process.env.NORDIC_SELF_TEST_MODE === '1'
 const DEFAULT_BOARD_TARGET = 'xiao_ble'
+const SUPPORTED_BOARD_TARGETS = ['xiao_ble', 'xiao_ble/nrf52840/sense', 'nrf52840dk/nrf52840']
 const MAX_BODY_BYTES = 2 * 1024 * 1024
 const MAX_FILE_BYTES = 512 * 1024
 
@@ -57,6 +58,9 @@ export function normalizeBoardTarget(value) {
   if (!/^[A-Za-z0-9_/-]+$/.test(target)) {
     throw new Error(`Unsafe Nordic board target: ${target}`)
   }
+  if (!SUPPORTED_BOARD_TARGETS.includes(target)) {
+    throw new Error(`Unsupported Nordic board target: ${target}. Supported targets: ${SUPPORTED_BOARD_TARGETS.join(', ')}`)
+  }
   return target
 }
 
@@ -86,6 +90,21 @@ export function writeNordicProject({ buildBase = BUILD_BASE, files = {}, boardTa
   }
 
   return { projectId, projectDir, boardTarget: safeBoardTarget, writtenFiles: writtenFiles.sort() }
+}
+
+export function createWestBuildArgs(project) {
+  const args = ['build', '-b', project.boardTarget, '.', '-d', 'build']
+  const cmakeArgs = []
+  if (project.writtenFiles.includes('boards/xiao_ble.overlay')) {
+    cmakeArgs.push(`-DDTC_OVERLAY_FILE=${join(project.projectDir, 'boards/xiao_ble.overlay')}`)
+  }
+  if (project.writtenFiles.includes('sysbuild/mcuboot/boards/xiao_ble.overlay')) {
+    cmakeArgs.push(`-Dmcuboot_EXTRA_DTC_OVERLAY_FILE=${join(project.projectDir, 'sysbuild/mcuboot/boards/xiao_ble.overlay')}`)
+  }
+  if (cmakeArgs.length) {
+    args.push('--', ...cmakeArgs)
+  }
+  return args
 }
 
 function runCommand(command, args, options = {}) {
@@ -190,7 +209,7 @@ async function compileNordicProject({ files, boardTarget }) {
     }
   }
 
-  const result = await runCommand('west', ['build', '-b', project.boardTarget, '.', '-d', 'build'], {
+  const result = await runCommand('west', createWestBuildArgs(project), {
     cwd: project.projectDir,
   })
   const artifacts = listArtifacts(join(project.projectDir, 'build'))

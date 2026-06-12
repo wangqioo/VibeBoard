@@ -219,7 +219,7 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
         <div className="nordic-command-box">
           <div className="nordic-heading">west</div>
           <code>{westBuild}</code>
-          <code>west flash</code>
+          <code>UF2 首刷 / MCUmgr 后续升级</code>
         </div>
         <div className="nordic-build-panel">
           <div className="nordic-heading">服务器 west build</div>
@@ -362,14 +362,14 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
       <aside className="nordic-assistant">
         <div className="nordic-chat-header">
           <div>
-            <div className="nordic-heading">AI 代码助手</div>
+            <div className="nordic-heading">AI 工程助手</div>
             <strong>nRF Connect SDK / Zephyr</strong>
           </div>
           <button onClick={onOpenSettings}>AI 设置</button>
         </div>
         <div className="nordic-chat-body">
           <p>描述需求后会调用已配置模型生成真实 Zephyr 工程文件，包含 CMake、prj.conf 和 src/main.c。</p>
-          <p>当前已接入服务器 west build 和浏览器 Web Serial DFU；首次预烧仍使用 west flash。</p>
+          <p>当前已接入服务器 west build、UF2 首刷和浏览器 Web Serial MCUmgr 后续升级。</p>
           <div className="nordic-prompts">
             {QUICK_PROMPTS.map(item => (
               <button key={item} onClick={() => setPrompt(item)}>{item}</button>
@@ -383,7 +383,7 @@ export default function NordicWorkspace({ settings, onOpenSettings }) {
             placeholder="描述你想要的 nRF 功能..."
           />
           <button className="nordic-primary" onClick={applyPrompt} disabled={aiState === 'generating' || !prompt.trim()}>
-            {aiState === 'generating' ? 'AI 生成中...' : 'AI 生成代码'}
+            {aiState === 'generating' ? 'AI 生成中...' : 'AI 生成工程'}
           </button>
         </div>
       </aside>

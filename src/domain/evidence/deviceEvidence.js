@@ -97,6 +97,8 @@ export function createDeviceEvidence({
 }
 
 function normalizeDeliveryStatus(status) {
+  if (status === true) return DEVICE_EVIDENCE_STATUS.SUCCESS
+  if (status === false) return DEVICE_EVIDENCE_STATUS.FAILURE
   if (status === DEVICE_EVIDENCE_STATUS.SUCCESS || status === 'ok' || status === 'done' || status === 'flashed' || status === 'rebooting') {
     return DEVICE_EVIDENCE_STATUS.SUCCESS
   }
@@ -109,9 +111,39 @@ function normalizeDeliveryStatus(status) {
   return DEVICE_EVIDENCE_STATUS.OBSERVED
 }
 
+function inferDeliveryStatus(status, deliveryResult) {
+  if (status) return normalizeDeliveryStatus(status)
+  if (deliveryResult?.status) return normalizeDeliveryStatus(deliveryResult.status)
+  if (deliveryResult?.ok !== undefined) return normalizeDeliveryStatus(Boolean(deliveryResult.ok))
+  if (deliveryResult?.error) return DEVICE_EVIDENCE_STATUS.FAILURE
+  return DEVICE_EVIDENCE_STATUS.OBSERVED
+}
+
+function deliveryEvidenceKind(status) {
+  if (status === DEVICE_EVIDENCE_STATUS.SUCCESS) return 'delivery-success'
+  if (status === DEVICE_EVIDENCE_STATUS.FAILURE) return 'delivery-failure'
+  if (status === DEVICE_EVIDENCE_STATUS.QUEUED) return 'delivery-queued'
+  return 'delivery-observed'
+}
+
+function inferFirmwareSize(firmwareSize, deliveryResult) {
+  return firmwareSize ?? deliveryResult?.firmwareSize ?? deliveryResult?.size ?? null
+}
+
+function inferProgress(progress, deliveryResult) {
+  return progress ?? deliveryResult?.progress ?? deliveryResult?.percent ?? null
+}
+
+function inferDeliveryMessage({ message, transport, status, deliveryResult }) {
+  if (message) return message
+  if (deliveryResult?.message) return deliveryResult.message
+  if (deliveryResult?.error) return deliveryResult.error
+  return `${transport || 'delivery'} ${status}`
+}
+
 export function createDeliveryDeviceEvidence({
   transport,
-  status = DEVICE_EVIDENCE_STATUS.OBSERVED,
+  status = null,
   message = '',
   firmwareSize = null,
   progress = null,
@@ -119,38 +151,47 @@ export function createDeliveryDeviceEvidence({
   deviceInfo = null,
   elapsedMs = null,
 } = {}) {
-  const normalizedStatus = normalizeDeliveryStatus(status)
-  const text = message || `${transport || 'delivery'} ${normalizedStatus}`
+  const result = deliveryResult && typeof deliveryResult === 'object' ? deliveryResult : {}
+  const normalizedTransport = transport || result.transport || 'delivery'
+  const normalizedStatus = inferDeliveryStatus(status, result)
+  const normalizedFirmwareSize = inferFirmwareSize(firmwareSize, result)
+  const normalizedProgress = inferProgress(progress, result)
+  const text = inferDeliveryMessage({
+    message,
+    transport: normalizedTransport,
+    status: normalizedStatus,
+    deliveryResult: result,
+  })
   const repairable = normalizedStatus === DEVICE_EVIDENCE_STATUS.FAILURE
   const symptom = {
     raw: text,
     line: text,
-    source: transport || 'delivery',
+    source: normalizedTransport,
     category: DEVICE_EVIDENCE_CATEGORIES.DELIVERY,
-    kind: repairable ? 'delivery-failure' : normalizedStatus === DEVICE_EVIDENCE_STATUS.SUCCESS ? 'delivery-success' : 'delivery-observed',
+    kind: deliveryEvidenceKind(normalizedStatus),
     status: normalizedStatus === DEVICE_EVIDENCE_STATUS.QUEUED ? DEVICE_EVIDENCE_STATUS.OBSERVED : normalizedStatus,
     severity: repairable ? 'error' : 'info',
     repairable,
     timestampMs: null,
-    component: transport || 'delivery',
+    component: normalizedTransport,
     message: text,
     details: {
-      transport: transport || null,
-      firmwareSize,
-      progress,
+      transport: normalizedTransport,
+      firmwareSize: normalizedFirmwareSize,
+      progress: normalizedProgress,
     },
   }
 
   return {
-    source: transport || 'delivery',
+    source: normalizedTransport,
     status: normalizedStatus,
     lines: [text],
     deliveryResult: {
-      ...(deliveryResult || {}),
-      transport: transport || deliveryResult?.transport || null,
+      ...result,
+      transport: normalizedTransport,
       status: normalizedStatus,
-      firmwareSize,
-      progress,
+      firmwareSize: normalizedFirmwareSize,
+      progress: normalizedProgress,
       message: text,
     },
     deviceInfo,

@@ -34,10 +34,10 @@ export function createNordicAppFiles(config = {}) {
     'README.md': createReadme({ ...merged, appName, boardTarget: board.boardTarget, boardName: board.name }),
   }
   if (board.boardTarget.startsWith('xiao_ble')) {
-    const overlay = createXiaoBleMcubootOverlay()
-    files['boards/xiao_ble.overlay'] = overlay
+    const partitionOverlay = createXiaoBleMcubootPartitionOverlay()
+    files['boards/xiao_ble.overlay'] = createXiaoBleAppOverlay(partitionOverlay)
     files['sysbuild/mcuboot/prj.conf'] = createMcubootPrjConf()
-    files['sysbuild/mcuboot/boards/xiao_ble.overlay'] = overlay
+    files['sysbuild/mcuboot/boards/xiao_ble.overlay'] = partitionOverlay
   }
   return files
 }
@@ -57,6 +57,9 @@ function createPrjConf(capabilities) {
     'CONFIG_SERIAL=y',
     'CONFIG_CONSOLE=y',
     'CONFIG_UART_CONSOLE=y',
+    'CONFIG_USB_DEVICE_STACK_NEXT=y',
+    'CONFIG_CDC_ACM_SERIAL_INITIALIZE_AT_BOOT=y',
+    'CONFIG_CDC_ACM_SERIAL_PRODUCT_STRING="VibeBoard XIAO CDC"',
     'CONFIG_LOG=y',
     'CONFIG_PRINTK=y',
     'CONFIG_NET_BUF=y',
@@ -94,11 +97,29 @@ function createSysbuildConf() {
 `
 }
 
-function createXiaoBleMcubootOverlay() {
+function createXiaoBleAppOverlay(partitionOverlay) {
   return `/ {
     chosen {
         zephyr,code-partition = &slot0_partition;
-        zephyr,uart-mcumgr = &uart0;
+        zephyr,console = &board_cdc_acm_uart;
+        zephyr,shell-uart = &board_cdc_acm_uart;
+        zephyr,uart-mcumgr = &board_cdc_acm_uart;
+    };
+};
+
+&zephyr_udc0 {
+    board_cdc_acm_uart: board_cdc_acm_uart {
+        compatible = "zephyr,cdc-acm-uart";
+    };
+};
+
+${partitionOverlay}`
+}
+
+function createXiaoBleMcubootPartitionOverlay() {
+  return `/ {
+    chosen {
+        zephyr,code-partition = &slot0_partition;
     };
 };
 

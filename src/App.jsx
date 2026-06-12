@@ -260,7 +260,7 @@ export default function App() {
           </div>
           <div className="divider" />
           <div className="workflow-strip" aria-label="Micro workflow">
-            生成 / 编译 / 烧录 / 设备证据
+            生成 / 编译 / 修复 / 烧录 / 设备证据
           </div>
           <div className="divider" />
           <div className="workspace-switcher">

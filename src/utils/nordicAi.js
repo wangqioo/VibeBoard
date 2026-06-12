@@ -25,6 +25,8 @@ const REQUIRED_DFU_CONFIG = [
   'CONFIG_CRC=y',
   'CONFIG_ZCBOR=y',
   'CONFIG_BUILD_OUTPUT_UF2=y',
+  'CONFIG_USB_DEVICE_STACK_NEXT=y',
+  'CONFIG_CDC_ACM_SERIAL_INITIALIZE_AT_BOOT=y',
 ]
 
 export function createNordicAiMessages({ userPrompt, board }) {
@@ -47,6 +49,8 @@ Rules:
 - prj.conf must keep CONFIG_PRINTK=y, CONFIG_CONSOLE=y, CONFIG_SERIAL=y, and CONFIG_UART_CONSOLE=y. Do not set them to n in the application image.
 - sysbuild.conf must include SB_CONFIG_BOOTLOADER_MCUBOOT=y.
 - boards/xiao_ble.overlay and sysbuild/mcuboot/boards/xiao_ble.overlay must define matching MCUboot partitions named boot_partition, slot0_partition, slot1_partition, and storage_partition.
+- boards/xiao_ble.overlay must route zephyr,console, zephyr,shell-uart, and zephyr,uart-mcumgr to a zephyr,cdc-acm-uart node named board_cdc_acm_uart.
+- sysbuild/mcuboot/boards/xiao_ble.overlay must stay partition-only; do not add USB CDC nodes to the MCUboot child image overlay.
 - sysbuild/mcuboot/prj.conf must include CONFIG_FLASH=y, CONFIG_BOOT_MAX_IMG_SECTORS=256, CONFIG_CONSOLE=n, and CONFIG_SERIAL=n.
 - src/main.c must call boot_write_img_confirmed() during startup.
 - Avoid board-specific aliases unless you guard them with Zephyr devicetree-safe fallback macros.`,
@@ -125,6 +129,18 @@ export function validateNordicGeneratedFiles(inputFiles) {
         throw new Error(`AI 返回的 ${path} 缺少 ${label}`)
       }
     }
+  }
+  for (const usbCdcFragment of [
+    'board_cdc_acm_uart',
+    'compatible = "zephyr,cdc-acm-uart"',
+    'zephyr,uart-mcumgr = &board_cdc_acm_uart',
+  ]) {
+    if (!files['boards/xiao_ble.overlay'].includes(usbCdcFragment)) {
+      throw new Error(`AI 返回的 boards/xiao_ble.overlay 缺少 USB CDC/MCUmgr 绑定：${usbCdcFragment}`)
+    }
+  }
+  if (files['sysbuild/mcuboot/boards/xiao_ble.overlay'].includes('board_cdc_acm_uart')) {
+    throw new Error('AI 返回的 sysbuild/mcuboot/boards/xiao_ble.overlay 不应包含 USB CDC 节点')
   }
   for (const symbol of ['CONFIG_FLASH=y', 'CONFIG_BOOT_MAX_IMG_SECTORS=256', 'CONFIG_CONSOLE=n', 'CONFIG_SERIAL=n']) {
     if (!files['sysbuild/mcuboot/prj.conf'].includes(symbol)) {

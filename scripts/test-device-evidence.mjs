@@ -152,26 +152,67 @@ assert.equal(usbDelivery.deliveryResult.firmwareSize, 262144)
 assert.equal(usbDelivery.symptoms[0].kind, 'delivery-success')
 assert.equal(usbDelivery.repairableSymptoms.length, 0)
 
+const wifiDelivery = createDeliveryDeviceEvidence({
+  transport: 'wifi-ota',
+  deliveryResult: {
+    ok: true,
+    ip: '192.168.1.42',
+    size: 393216,
+    progress: 100,
+  },
+})
+assert.equal(wifiDelivery.source, 'wifi-ota')
+assert.equal(wifiDelivery.status, 'success')
+assert.equal(wifiDelivery.deliveryResult.transport, 'wifi-ota')
+assert.equal(wifiDelivery.deliveryResult.ip, '192.168.1.42')
+assert.equal(wifiDelivery.deliveryResult.firmwareSize, 393216)
+assert.equal(wifiDelivery.deliveryResult.progress, 100)
+assert.equal(wifiDelivery.symptoms[0].category, 'delivery')
+assert.equal(wifiDelivery.symptoms[0].kind, 'delivery-success')
+assert.equal(wifiDelivery.symptoms[0].details.transport, 'wifi-ota')
+assert.equal(wifiDelivery.repairableSymptoms.length, 0)
+
 const bleDeliveryFailure = createDeliveryDeviceEvidence({
   transport: 'ble-ota',
-  status: 'failure',
-  message: '设备错误: esp_ota_write failed',
-  deviceInfo: { name: 'ESP32-Vibe-OTA' },
+  deliveryResult: {
+    error: '设备错误: esp_ota_write failed',
+    deviceName: 'ESP32-Vibe-OTA',
+    firmwareSize: 262144,
+    progress: 37,
+  },
 })
 assert.equal(bleDeliveryFailure.source, 'ble-ota')
 assert.equal(bleDeliveryFailure.status, 'failure')
+assert.equal(bleDeliveryFailure.deliveryResult.deviceName, 'ESP32-Vibe-OTA')
+assert.equal(bleDeliveryFailure.deliveryResult.progress, 37)
 assert.equal(bleDeliveryFailure.symptoms[0].kind, 'delivery-failure')
 assert.equal(bleDeliveryFailure.repairableSymptoms[0].category, 'delivery')
 assert.match(bleDeliveryFailure.repairableSymptoms[0].message, /esp_ota_write failed/)
 
 const remoteQueued = createDeliveryDeviceEvidence({
   transport: 'remote-ota',
-  status: 'queued',
-  message: '远程 OTA 已下发，等待设备领取',
-  deliveryResult: { jobId: 'job-1234', deviceId: 'szpi-s3' },
+  deliveryResult: { status: 'queued', jobId: 'job-1234', deviceId: 'szpi-s3' },
 })
 assert.equal(remoteQueued.status, 'queued')
 assert.equal(remoteQueued.deliveryResult.jobId, 'job-1234')
+assert.equal(remoteQueued.deliveryResult.status, 'queued')
 assert.equal(remoteQueued.symptoms[0].status, 'observed')
+
+const remoteDone = createDeliveryDeviceEvidence({
+  transport: 'remote-ota',
+  deliveryResult: { status: 'flashed', jobId: 'job-1234', deviceId: 'szpi-s3' },
+})
+assert.equal(remoteDone.status, 'success')
+assert.equal(remoteDone.deliveryResult.status, 'success')
+assert.equal(remoteDone.symptoms[0].kind, 'delivery-success')
+
+const usbQueued = createDeliveryDeviceEvidence({
+  transport: 'usb',
+  deliveryResult: { status: 'pushing', automatic: true, firmwareSize: 262144 },
+})
+assert.equal(usbQueued.status, 'queued')
+assert.equal(usbQueued.deliveryResult.automatic, true)
+assert.equal(usbQueued.symptoms[0].kind, 'delivery-queued')
+assert.equal(usbQueued.symptoms[0].status, 'observed')
 
 console.log('device evidence tests passed')
