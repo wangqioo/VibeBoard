@@ -8,6 +8,7 @@
     "build": "vite build",
     "test:build-evidence": "node scripts/test-build-evidence.mjs",
     "test:device-evidence": "node scripts/test-device-evidence.mjs",
+    "test:evidence-package": "node scripts/test-evidence-package.mjs",
     "test:device-evidence-bridge": "node scripts/test-device-evidence-bridge.mjs",
     "test:compile-panel-delivery-evidence": "node scripts/test-compile-panel-delivery-evidence.mjs",
     "test:compile-panel-build-evidence-ui": "node scripts/test-compile-panel-build-evidence-ui.mjs",
