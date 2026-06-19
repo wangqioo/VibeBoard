@@ -1,7 +1,7 @@
 const TOOLS = [
   { name: 'vibeboard.health', status: 'available', transports: ['stdio'] },
   { name: 'vibeboard.list_capabilities', status: 'available', transports: ['stdio'] },
-  { name: 'vibeboard.compile_project', status: 'planned', transports: ['stdio'] },
+  { name: 'vibeboard.compile_project', status: 'available', transports: ['stdio'] },
   { name: 'vibeboard.get_build_evidence', status: 'planned', transports: ['stdio'] },
   { name: 'vibeboard.flash_usb', status: 'planned', transports: ['stdio', 'bridge', 'optional-browser'] },
   { name: 'vibeboard.flash_wifi_ota', status: 'planned', transports: ['stdio'] },

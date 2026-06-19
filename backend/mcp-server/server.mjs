@@ -4,14 +4,16 @@ import { stdin as input, stdout as output } from 'node:process'
 import { createInterface } from 'node:readline/promises'
 
 import { listCapabilities, runHealth } from './tools/capabilities.mjs'
+import { compileProjectTool } from './tools/compileProject.mjs'
 import { requireObject } from './tools/validate.mjs'
 
 const TOOL_HANDLERS = {
   'vibeboard.health': runHealth,
   'vibeboard.list_capabilities': listCapabilities,
+  'vibeboard.compile_project': compileProjectTool,
 }
 
-export async function dispatchTool(name, input = {}) {
+export async function dispatchTool(name, input = {}, adapters = {}) {
   requireObject(input)
 
   const handler = TOOL_HANDLERS[name]
@@ -26,7 +28,7 @@ export async function dispatchTool(name, input = {}) {
 
   return {
     status: 'success',
-    result: handler(input),
+    result: await handler(input, adapters),
   }
 }
 

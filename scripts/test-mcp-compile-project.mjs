@@ -12,6 +12,15 @@ import {
 import {
   compileProjectWithService,
 } from '../backend/mcp-server/tools/compilerClient.mjs'
+import {
+  compileProjectTool,
+} from '../backend/mcp-server/tools/compileProject.mjs'
+import {
+  listCapabilities,
+} from '../backend/mcp-server/tools/capabilities.mjs'
+import {
+  dispatchTool,
+} from '../backend/mcp-server/server.mjs'
 
 const workspace = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-workspace-'))
 await mkdir(join(workspace, 'main', 'nested'), { recursive: true })
@@ -70,8 +79,13 @@ const fakeFetch = async (url, request) => {
   assert.equal(url, 'http://compiler.local/compile')
   assert.equal(request.method, 'POST')
   const payload = JSON.parse(request.body)
-  assert.equal(payload.projectId, 'project-1')
-  assert.equal(payload.projectFiles['main/main.c'], 'void app_main(void) {}')
+  assert.equal(typeof payload.projectId, 'string')
+  assert.equal(payload.projectId.length > 0, true)
+  const mainSource = payload.projectFiles['main/main.c'] || payload.projectFiles['main/main.cpp']
+  assert.equal(typeof mainSource, 'string')
+  if (payload.code !== undefined) assert.equal(mainSource, payload.code)
+  if (payload.code !== undefined) assert.equal(typeof payload.code, 'string')
+  assert.equal((payload.code || mainSource).includes('app_main'), true)
   return sseResponse([
     'data: {"log":"building"}\n\n',
     'data: {"done":true,"bin":"ZmlybXdhcmU=","size":8,"filename":"firmware.bin","buildId":"build-1","command":"idf.py build","flashFiles":[{"name":"bootloader.bin","offset":"0x1000","bin":"Ym9vdA==","size":4}]}\n\n',
@@ -157,5 +171,105 @@ const unsafeArtifact = await writeCompileArtifacts({
 assert.match(unsafeArtifact.firmware.path, /project_one_two\/firmware_unsafe_name\.bin$/)
 assert.equal(unsafeArtifact.flashFiles[0].name, 'boot_loader_1.bin')
 assert.deepEqual(await readFile(unsafeArtifact.firmware.path), Buffer.from('firmware'))
+
+const toolArtifactDir = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-tool-artifacts-'))
+const toolResult = await compileProjectTool({
+  workspacePath: workspace,
+  boardId: 'szpi_esp32s3',
+  projectId: 'tool-project',
+  selectedSkills: ['display', 'bad/value', 'wifi_6', '', 'toolong'.repeat(11), 42],
+}, {
+  compilerUrl: 'http://compiler.local',
+  artifactDir: toolArtifactDir,
+  fetchImpl: fakeFetch,
+})
+assert.equal(toolResult.status, 'success')
+assert.equal(toolResult.artifact.firmware.size, 8)
+assert.match(toolResult.artifact.firmware.path, /firmware\.bin$/)
+assert.deepEqual(toolResult.diagnostics, [])
+assert.deepEqual(toolResult.logs, ['building'])
+assert.deepEqual(toolResult.compilePackage, {
+  mainFile: 'main.c',
+  selectedSkills: ['display', 'wifi_6'],
+})
+
+const cppWorkspace = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-cpp-workspace-'))
+await mkdir(join(cppWorkspace, 'main'), { recursive: true })
+await writeFile(join(cppWorkspace, 'main', 'main.c'), 'void legacy(void) {}')
+await writeFile(join(cppWorkspace, 'main', 'main.cpp'), 'extern "C" void app_main(void) {}')
+const cppPayloads = []
+const cppResult = await compileProjectTool({
+  workspacePath: cppWorkspace,
+  boardId: 'szpi_esp32s3',
+}, {
+  artifactDir: await mkdtemp(join(tmpdir(), 'vibeboard-mcp-cpp-artifacts-')),
+  compilerUrl: 'http://compiler.local',
+  fetchImpl: async (url, request) => {
+    assert.equal(url, 'http://compiler.local/compile')
+    assert.equal(request.method, 'POST')
+    const payload = JSON.parse(request.body)
+    cppPayloads.push(payload)
+    assert.equal(payload.projectId, 'szpi_esp32s3')
+    assert.equal(payload.code, 'extern "C" void app_main(void) {}')
+    assert.equal(payload.projectFiles.__mainFile, 'main.cpp')
+    assert.deepEqual(payload.projectFiles.__selectedSkills, [])
+    return sseResponse([
+      'data: {"done":true,"bin":"ZmlybXdhcmU=","size":8,"filename":"firmware.bin"}\n\n',
+    ])
+  },
+})
+assert.equal(cppResult.status, 'success')
+assert.equal(cppPayloads.length, 1)
+assert.equal(cppResult.compilePackage.mainFile, 'main.cpp')
+
+const missingMainWorkspace = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-no-main-'))
+await mkdir(join(missingMainWorkspace, 'components', 'demo'), { recursive: true })
+await writeFile(join(missingMainWorkspace, 'components', 'demo', 'demo.c'), 'void demo(void) {}')
+const missingMainResult = await compileProjectTool({
+  workspacePath: missingMainWorkspace,
+  boardId: 'szpi_esp32s3',
+})
+assert.equal(missingMainResult.status, 'failure')
+assert.equal(missingMainResult.artifact, null)
+assert.equal(missingMainResult.buildEvidence.status, 'failure')
+assert.equal(missingMainResult.buildEvidence.category, 'compile-package-invalid')
+
+const unsupportedBoardResult = await compileProjectTool({
+  workspacePath: workspace,
+  boardId: 'unsupported',
+})
+assert.equal(unsupportedBoardResult.status, 'failure')
+assert.equal(unsupportedBoardResult.artifact, null)
+assert.equal(unsupportedBoardResult.buildEvidence.category, 'compile-package-invalid')
+
+await assert.rejects(
+  () => compileProjectTool(null),
+  /input must be an object/,
+)
+await assert.rejects(
+  () => compileProjectTool({ boardId: 'szpi_esp32s3' }),
+  /workspacePath is required/,
+)
+await assert.rejects(
+  () => compileProjectTool({ workspacePath: workspace }),
+  /boardId is required/,
+)
+
+const compileCapability = listCapabilities().tools.find(tool => tool.name === 'vibeboard.compile_project')
+assert.equal(compileCapability.status, 'available')
+assert.deepEqual(compileCapability.transports, ['stdio'])
+
+const dispatched = await dispatchTool('vibeboard.compile_project', {
+  workspacePath: workspace,
+  boardId: 'szpi_esp32s3',
+  projectId: 'dispatch-project',
+}, {
+  compilerUrl: 'http://compiler.local',
+  artifactDir: await mkdtemp(join(tmpdir(), 'vibeboard-mcp-dispatch-artifacts-')),
+  fetchImpl: fakeFetch,
+})
+assert.equal(dispatched.status, 'success')
+assert.equal(dispatched.result.status, 'success')
+assert.equal(dispatched.result.compilePackage.mainFile, 'main.c')
 
 console.log('MCP compile project tests passed.')

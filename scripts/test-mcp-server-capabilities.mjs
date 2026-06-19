@@ -7,7 +7,7 @@ import { dispatchTool } from '../backend/mcp-server/server.mjs'
 const expectedTools = [
   ['vibeboard.health', 'available', ['stdio']],
   ['vibeboard.list_capabilities', 'available', ['stdio']],
-  ['vibeboard.compile_project', 'planned', ['stdio']],
+  ['vibeboard.compile_project', 'available', ['stdio']],
   ['vibeboard.get_build_evidence', 'planned', ['stdio']],
   ['vibeboard.flash_usb', 'planned', ['stdio', 'bridge', 'optional-browser']],
   ['vibeboard.flash_wifi_ota', 'planned', ['stdio']],
