@@ -1,0 +1,138 @@
+.mcp-panel {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.mcp-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mcp-panel-header h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.mcp-panel-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mcp-server-chip,
+.mcp-status,
+.mcp-transport-list span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mcp-server-chip {
+  color: var(--accent-hover);
+  background: var(--accent-muted);
+  border-color: var(--accent);
+}
+
+.mcp-command-block {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.mcp-command-block span {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.mcp-command-block code,
+.mcp-tool-title code {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.mcp-tool-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mcp-tool-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.mcp-tool-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mcp-tool-main p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mcp-status.available {
+  color: var(--accent-hover);
+  background: var(--accent-muted);
+  border-color: var(--accent);
+}
+
+.mcp-status.planned {
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+}
+
+.mcp-transport-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: 180px;
+}
+
+.mcp-transport-list span {
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+}
+
+@media (max-width: 980px) {
+  .mcp-tool-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mcp-transport-list {
+    justify-content: flex-start;
+    max-width: none;
+  }
+}

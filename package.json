@@ -12,6 +12,7 @@
     "test:mcp-usb-flash": "node scripts/test-mcp-usb-flash.mjs",
     "test:mcp-wifi-ota": "node scripts/test-mcp-wifi-ota.mjs",
     "test:mcp-ble-ota-device-evidence": "node scripts/test-mcp-ble-ota-device-evidence.mjs",
+    "test:mcp-panel-ui": "node scripts/test-mcp-panel-ui.mjs",
     "mcp:server": "node backend/mcp-server/server.mjs",
     "test:mcp-server-capabilities": "node scripts/test-mcp-server-capabilities.mjs",
     "test:device-evidence": "node scripts/test-device-evidence.mjs",

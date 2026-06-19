@@ -6,6 +6,7 @@ import CompilePanel from './components/CompilePanel'
 import ProjectEditor from './components/ProjectEditor'
 import HuangshanWorkspace from './components/HuangshanWorkspace'
 import NordicWorkspace from './components/NordicWorkspace'
+import McpPanel from './components/McpPanel'
 import { BOARDS, DEFAULT_BOARD_ID, getBoardList, getBoard } from './context/boards'
 import { listPlatformBoards, getPlatformBoard } from './context/boardPlatform'
 import { TOOLCHAINS } from './context/boardContract'
@@ -391,7 +392,7 @@ export default function App() {
                 />
               </div>
               <div className={`right-tab-panel ${rightTab === 'mcp' ? 'active' : ''}`}>
-                <p>Local MCP server will expose compile, flash, preview, and evidence tools.</p>
+                <McpPanel />
               </div>
             </div>
           </div>
