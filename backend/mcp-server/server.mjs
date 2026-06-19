@@ -5,12 +5,14 @@ import { createInterface } from 'node:readline/promises'
 
 import { listCapabilities, runHealth } from './tools/capabilities.mjs'
 import { compileProjectTool } from './tools/compileProject.mjs'
+import { getBuildEvidenceTool } from './tools/buildEvidence.mjs'
 import { requireObject } from './tools/validate.mjs'
 
 const TOOL_HANDLERS = {
   'vibeboard.health': runHealth,
   'vibeboard.list_capabilities': listCapabilities,
   'vibeboard.compile_project': compileProjectTool,
+  'vibeboard.get_build_evidence': getBuildEvidenceTool,
 }
 
 export async function dispatchTool(name, input = {}, adapters = {}) {

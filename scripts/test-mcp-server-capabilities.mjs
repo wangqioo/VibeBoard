@@ -8,7 +8,7 @@ const expectedTools = [
   ['vibeboard.health', 'available', ['stdio']],
   ['vibeboard.list_capabilities', 'available', ['stdio']],
   ['vibeboard.compile_project', 'available', ['stdio']],
-  ['vibeboard.get_build_evidence', 'planned', ['stdio']],
+  ['vibeboard.get_build_evidence', 'available', ['stdio']],
   ['vibeboard.flash_usb', 'planned', ['stdio', 'bridge', 'optional-browser']],
   ['vibeboard.flash_wifi_ota', 'planned', ['stdio']],
   ['vibeboard.flash_ble_ota', 'planned', ['stdio', 'bridge', 'optional-browser']],

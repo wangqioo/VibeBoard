@@ -17,6 +17,9 @@ import {
   compileProjectTool,
 } from '../backend/mcp-server/tools/compileProject.mjs'
 import {
+  getBuildEvidenceTool,
+} from '../backend/mcp-server/tools/buildEvidence.mjs'
+import {
   listCapabilities,
 } from '../backend/mcp-server/tools/capabilities.mjs'
 import {
@@ -204,6 +207,21 @@ assert.equal(persistedSuccessEvidence.buildEvidence.status, 'success')
 assert.equal(persistedSuccessEvidence.artifact.firmware.size, 8)
 assert.equal(persistedSuccessEvidence.compilePackage.mainFile, 'main.c')
 
+const queriedEvidence = await getBuildEvidenceTool({
+  artifactDir: toolArtifactDir,
+  projectId: 'tool-project',
+})
+assert.equal(queriedEvidence.status, 'success')
+assert.equal(queriedEvidence.record.projectId, 'tool-project')
+assert.equal(queriedEvidence.record.buildEvidence.status, 'success')
+
+const missingEvidence = await getBuildEvidenceTool({
+  artifactDir: toolArtifactDir,
+  projectId: 'missing-project',
+})
+assert.equal(missingEvidence.status, 'not-found')
+assert.equal(missingEvidence.record, null)
+
 const failureWorkspace = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-failure-'))
 await mkdir(join(failureWorkspace, 'main'), { recursive: true })
 await writeFile(join(failureWorkspace, 'main', 'main.c'), 'void app_main(void) {}')
@@ -327,5 +345,13 @@ const dispatched = await dispatchTool('vibeboard.compile_project', {
 assert.equal(dispatched.status, 'success')
 assert.equal(dispatched.result.status, 'success')
 assert.equal(dispatched.result.compilePackage.mainFile, 'main.c')
+
+const dispatchEvidence = await dispatchTool('vibeboard.get_build_evidence', {
+  artifactDir: toolArtifactDir,
+  projectId: 'tool-project',
+})
+assert.equal(dispatchEvidence.status, 'success')
+assert.equal(dispatchEvidence.result.status, 'success')
+assert.equal(dispatchEvidence.result.record.projectId, 'tool-project')
 
 console.log('MCP compile project tests passed.')
