@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline/promises'
 import { listCapabilities, runHealth } from './tools/capabilities.mjs'
 import { compileProjectTool } from './tools/compileProject.mjs'
 import { getBuildEvidenceTool } from './tools/buildEvidence.mjs'
+import { renderLvglPreviewTool } from './tools/lvglPreview.mjs'
 import { requireObject } from './tools/validate.mjs'
 
 const TOOL_HANDLERS = {
@@ -13,6 +14,7 @@ const TOOL_HANDLERS = {
   'vibeboard.list_capabilities': listCapabilities,
   'vibeboard.compile_project': compileProjectTool,
   'vibeboard.get_build_evidence': getBuildEvidenceTool,
+  'vibeboard.render_lvgl_preview': renderLvglPreviewTool,
 }
 
 export async function dispatchTool(name, input = {}, adapters = {}) {

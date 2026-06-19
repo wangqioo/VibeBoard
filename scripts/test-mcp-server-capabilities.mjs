@@ -12,7 +12,7 @@ const expectedTools = [
   ['vibeboard.flash_usb', 'planned', ['stdio', 'bridge', 'optional-browser']],
   ['vibeboard.flash_wifi_ota', 'planned', ['stdio']],
   ['vibeboard.flash_ble_ota', 'planned', ['stdio', 'bridge', 'optional-browser']],
-  ['vibeboard.render_lvgl_preview', 'planned', ['stdio']],
+  ['vibeboard.render_lvgl_preview', 'available', ['stdio']],
   ['vibeboard.collect_device_evidence', 'planned', ['stdio']],
 ]
 

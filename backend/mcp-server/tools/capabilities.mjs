@@ -6,7 +6,7 @@ const TOOLS = [
   { name: 'vibeboard.flash_usb', status: 'planned', transports: ['stdio', 'bridge', 'optional-browser'] },
   { name: 'vibeboard.flash_wifi_ota', status: 'planned', transports: ['stdio'] },
   { name: 'vibeboard.flash_ble_ota', status: 'planned', transports: ['stdio', 'bridge', 'optional-browser'] },
-  { name: 'vibeboard.render_lvgl_preview', status: 'planned', transports: ['stdio'] },
+  { name: 'vibeboard.render_lvgl_preview', status: 'available', transports: ['stdio'] },
   { name: 'vibeboard.collect_device_evidence', status: 'planned', transports: ['stdio'] },
 ]
 
