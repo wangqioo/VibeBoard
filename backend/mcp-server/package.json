@@ -1,0 +1,8 @@
+{
+  "name": "@vibeboard/mcp-server",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "vibeboard-mcp-server": "./server.mjs"
+  }
+}
