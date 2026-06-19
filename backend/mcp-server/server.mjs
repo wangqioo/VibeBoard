@@ -9,6 +9,8 @@ import { getBuildEvidenceTool } from './tools/buildEvidence.mjs'
 import { renderLvglPreviewTool } from './tools/lvglPreview.mjs'
 import { flashUsbTool } from './tools/usbFlash.mjs'
 import { flashWifiOtaTool } from './tools/wifiOta.mjs'
+import { flashBleOtaTool } from './tools/bleOta.mjs'
+import { collectDeviceEvidenceTool } from './tools/deviceEvidence.mjs'
 import { requireObject } from './tools/validate.mjs'
 
 const TOOL_HANDLERS = {
@@ -19,6 +21,8 @@ const TOOL_HANDLERS = {
   'vibeboard.render_lvgl_preview': renderLvglPreviewTool,
   'vibeboard.flash_usb': flashUsbTool,
   'vibeboard.flash_wifi_ota': flashWifiOtaTool,
+  'vibeboard.flash_ble_ota': flashBleOtaTool,
+  'vibeboard.collect_device_evidence': collectDeviceEvidenceTool,
 }
 
 export async function dispatchTool(name, input = {}, adapters = {}) {

@@ -11,9 +11,9 @@ const expectedTools = [
   ['vibeboard.get_build_evidence', 'available', ['stdio']],
   ['vibeboard.flash_usb', 'available', ['stdio', 'bridge', 'optional-browser']],
   ['vibeboard.flash_wifi_ota', 'available', ['stdio']],
-  ['vibeboard.flash_ble_ota', 'planned', ['stdio', 'bridge', 'optional-browser']],
+  ['vibeboard.flash_ble_ota', 'available', ['stdio', 'bridge', 'optional-browser']],
   ['vibeboard.render_lvgl_preview', 'available', ['stdio']],
-  ['vibeboard.collect_device_evidence', 'planned', ['stdio']],
+  ['vibeboard.collect_device_evidence', 'available', ['stdio']],
 ]
 
 assert.deepEqual(runHealth(), {
