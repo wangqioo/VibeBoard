@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the MCP server as the local stdio entrypoint. Add a Node-side compile tool that reads explicit workspace files, reuses VibeBoard's compile-package boundary, calls the existing compiler-service SSE API through an injectable fetch adapter, writes returned firmware artifacts under a local artifact directory, and returns JSON-safe evidence. The first implementation is unit-tested with fake fetch responses and does not require the real compiler service.
 
-**Tech Stack:** Node ESM, existing `src/domain/compilePackage/compilePackage.js`, board registry modules, stdio MCP skeleton, Node built-ins for filesystem/path/crypto, fake fetch tests.
+**Tech Stack:** Node ESM, compiler-service payload contract, stdio MCP skeleton, Node built-ins for filesystem/path/crypto, fake fetch tests.
 
 ---
 
@@ -26,7 +26,7 @@
 - Create: `backend/mcp-server/tools/compileProject.mjs`
   - Validates MCP input.
   - Reads workspace files.
-  - Creates compile package.
+  - Builds a Node-native compiler-service payload.
   - Calls compiler client.
   - Writes artifacts.
   - Returns `{ status, artifact, buildEvidence, diagnostics }`.
@@ -517,7 +517,7 @@ const toolResult = await compileProjectTool({
   workspacePath: toolWorkspace,
   boardId: 'szpi_esp32s3',
   selectedSkills: [],
-  projectId: 'tool-project',
+  projectId: 'project-1',
   compilerUrl: 'http://compiler.local',
   artifactDir,
 }, {
@@ -527,6 +527,7 @@ assert.equal(toolResult.status, 'success')
 assert.equal(toolResult.artifact.firmware.size, 8)
 assert.equal(toolResult.buildEvidence.status, 'success')
 assert.equal(toolResult.compilePackage.mainFile, 'main.c')
+assert.deepEqual(toolResult.compilePackage.selectedSkills, [])
 
 const dispatchResult = await dispatchTool('vibeboard.compile_project', {
   workspacePath: toolWorkspace,
@@ -564,12 +565,27 @@ Create `backend/mcp-server/tools/compileProject.mjs`:
 ```js
 import { resolve } from 'node:path'
 
-import { getBoard } from '../../../src/context/boards/index.js'
-import { createCompilePackage } from '../../../src/domain/compilePackage/compilePackage.js'
 import { requireObject } from './validate.mjs'
 import { readWorkspaceProjectFiles } from './workspaceFiles.mjs'
 import { compileProjectWithService } from './compilerClient.mjs'
 import { writeCompileArtifacts } from './artifacts.mjs'
+
+const SUPPORTED_BOARD_IDS = new Set(['szpi_esp32s3'])
+
+function detectMainFile(projectFiles = {}) {
+  if (/\bapp_main\s*\(/.test(projectFiles['main/main.cpp'] || '')) return 'main.cpp'
+  if (/\bapp_main\s*\(/.test(projectFiles['main/main.c'] || '')) return 'main.c'
+  if (projectFiles['main/main.c']) return 'main.c'
+  if (projectFiles['main/main.cpp']) return 'main.cpp'
+  return null
+}
+
+function normalizeSelectedSkills(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(item => String(item || '').trim())
+    .filter(item => /^[A-Za-z0-9_-]{1,64}$/.test(item))
+}
 
 function defaultArtifactDir() {
   return resolve(process.cwd(), 'outputs', 'mcp-artifacts')
@@ -579,42 +595,44 @@ export async function compileProjectTool(input = {}, adapters = {}) {
   const params = requireObject(input)
   if (!params.workspacePath) throw new Error('workspacePath is required')
   if (!params.boardId) throw new Error('boardId is required')
-
-  const board = getBoard(params.boardId)
-  if (!board) throw new Error(`unknown boardId: ${params.boardId}`)
+  if (!SUPPORTED_BOARD_IDS.has(params.boardId)) throw new Error(`unsupported boardId: ${params.boardId}`)
 
   const projectFiles = await readWorkspaceProjectFiles({ workspacePath: params.workspacePath })
-  const compilePackage = createCompilePackage({
-    boardId: params.boardId,
-    board,
-    projectFiles,
-    selectedSkills: params.selectedSkills || [],
-    projectName: params.projectName || 'vibe_app',
-  })
+  const mainFile = detectMainFile(projectFiles)
+  const selectedSkills = normalizeSelectedSkills(params.selectedSkills)
 
-  if (!compilePackage.ok) {
+  if (!mainFile) {
     return {
       status: 'failure',
       artifact: null,
       buildEvidence: {
         status: 'failure',
-        error: compilePackage.message,
+        error: 'missing entry file with app_main(): main/main.c or main/main.cpp',
         category: 'compile-package-invalid',
       },
-      diagnostics: compilePackage.diagnostics,
+      diagnostics: [{
+        category: 'missing-entry-file',
+        message: 'missing entry file with app_main(): main/main.c or main/main.cpp',
+      }],
       compilePackage: {
-        mainFile: compilePackage.mainFile,
-        selectedSkills: compilePackage.selectedSkills,
+        mainFile: null,
+        selectedSkills,
       },
     }
   }
 
   const projectId = params.projectId || `mcp-${Date.now()}`
+  const backendProjectFiles = {
+    ...projectFiles,
+    __mainFile: mainFile,
+    __selectedSkills: selectedSkills,
+  }
   const compileResult = await compileProjectWithService({
     compilerUrl: params.compilerUrl,
     payload: {
       projectId,
-      projectFiles: compilePackage.backendProjectFiles,
+      code: projectFiles[`main/${mainFile}`],
+      projectFiles: backendProjectFiles,
     },
     fetchImpl: adapters.fetchImpl,
   })
@@ -624,11 +642,11 @@ export async function compileProjectTool(input = {}, adapters = {}) {
       status: 'failure',
       artifact: null,
       buildEvidence: compileResult.buildEvidence,
-      diagnostics: compilePackage.diagnostics,
+      diagnostics: [],
       logs: compileResult.logs,
       compilePackage: {
-        mainFile: compilePackage.mainFile,
-        selectedSkills: compilePackage.selectedSkills,
+        mainFile,
+        selectedSkills,
       },
     }
   }
@@ -647,12 +665,20 @@ export async function compileProjectTool(input = {}, adapters = {}) {
     diagnostics: [],
     logs: compileResult.logs,
     compilePackage: {
-      mainFile: compilePackage.mainFile,
-      selectedSkills: compilePackage.selectedSkills,
+      mainFile,
+      selectedSkills,
     },
   }
 }
 ```
+
+This Task intentionally does not import frontend `src/context` or
+`src/domain/compilePackage` modules. Those modules use Vite-oriented extensionless
+imports, so importing them directly from the Node stdio MCP server would break
+runtime loading. The trusted System-Owned Project File boundary is still enforced
+by `backend/compiler-service/server.py`, which ignores client-supplied system
+files and regenerates `main/CMakeLists.txt`, `main/idf_component.yml`,
+`sdkconfig.defaults`, and `partitions.csv` from `__selectedSkills`.
 
 - [ ] **Step 4: Wire server dispatch**
 
@@ -772,4 +798,3 @@ git status --short
 ```
 
 Expected: only known unrelated untracked files remain, especially `docs/architecture-review.html`.
-
