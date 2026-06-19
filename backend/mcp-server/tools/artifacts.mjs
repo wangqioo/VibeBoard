@@ -87,3 +87,27 @@ export async function writeCompileArtifacts({
     flashFiles: writtenFlashFiles,
   }
 }
+
+export async function writePreviewArtifact({
+  artifactDir,
+  projectId = 'project',
+  screenshotPng,
+  renderer = null,
+  viewport = null,
+} = {}) {
+  if (!screenshotPng) return null
+
+  const projectDir = projectArtifactDir(artifactDir, projectId)
+  await mkdir(projectDir, { recursive: true })
+
+  const path = join(projectDir, 'lvgl-preview.png')
+  const bytes = Buffer.from(screenshotPng, 'base64')
+  await writeFile(path, bytes)
+
+  return {
+    path,
+    size: bytes.length,
+    renderer,
+    viewport,
+  }
+}
