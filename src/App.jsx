@@ -11,6 +11,7 @@ import { listPlatformBoards, getPlatformBoard } from './context/boardPlatform'
 import { TOOLCHAINS } from './context/boardContract'
 import { providerKeyForBaseUrl } from './utils/aiApi'
 import { buildDefaultSettings } from './config/aiDefaults'
+import { ENABLE_LEGACY_WEB_AGENT } from './config/productFlags'
 import { buildGeneratedConfig } from './utils/projectAssembly'
 import { isSourcePath } from './utils/filePlacement'
 import { normalizeGeneratedSourceFiles } from './utils/projectValidation'
@@ -104,7 +105,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showCompile, setShowCompile] = useState(false)
   const [workspaceMode, setWorkspaceMode] = useState('esp-idf')
-  const [rightTab, setRightTab] = useState('chat')
+  const [rightTab, setRightTab] = useState('log')
   const [pendingLogAnalysis, setPendingLogAnalysis] = useState(null)
   const [pendingBuildRepair, setPendingBuildRepair] = useState(null)
   const [compileSessionId, setCompileSessionId] = useState(newCompileSessionId)
@@ -335,36 +336,43 @@ export default function App() {
 
           <div className="right-pane">
             <div className="right-tabs">
-              <button className={`right-tab ${rightTab === 'chat' ? 'active' : ''}`} onClick={() => setRightTab('chat')}>
-                AI 工作流
-              </button>
+              {ENABLE_LEGACY_WEB_AGENT && (
+                <button className={`right-tab ${rightTab === 'chat' ? 'active' : ''}`} onClick={() => setRightTab('chat')}>
+                  Legacy Agent
+                </button>
+              )}
               <button className={`right-tab ${rightTab === 'log' ? 'active' : ''}`} onClick={() => setRightTab('log')}>
                 设备证据
               </button>
+              <button className={`right-tab ${rightTab === 'mcp' ? 'active' : ''}`} onClick={() => setRightTab('mcp')}>
+                MCP
+              </button>
             </div>
             <div className="right-tab-content">
-              <div className={`right-tab-panel ${rightTab === 'chat' ? 'active' : ''}`}>
-                <ChatPanel
-                  settings={settings}
-                  board={board}
-                  boardId={boardId}
-                  onInsertCode={handleInsertCode}
-                  onCompileArtifact={handleCompileArtifact}
-                  initialPrompt={pendingLogAnalysis}
-                  onConsumePrompt={() => setPendingLogAnalysis(null)}
-                  repairRequest={pendingBuildRepair}
-                  onConsumeRepairRequest={() => setPendingBuildRepair(null)}
-                  projectFiles={projectFiles}
-                  latestManifest={latestManifest}
-                  previewContext={latestPreviewContext}
-                  recentDeviceEvidence={latestDeviceEvidence}
-                  acceptanceState={acceptanceState}
-                  activeFile={activeFile}
-                  selectedSkills={selectedSkills}
-                  onSkillsChange={handleSkillsChange}
-                  onResetProject={resetProjectState}
-                />
-              </div>
+              {ENABLE_LEGACY_WEB_AGENT && (
+                <div className={`right-tab-panel ${rightTab === 'chat' ? 'active' : ''}`}>
+                  <ChatPanel
+                    settings={settings}
+                    board={board}
+                    boardId={boardId}
+                    onInsertCode={handleInsertCode}
+                    onCompileArtifact={handleCompileArtifact}
+                    initialPrompt={pendingLogAnalysis}
+                    onConsumePrompt={() => setPendingLogAnalysis(null)}
+                    repairRequest={pendingBuildRepair}
+                    onConsumeRepairRequest={() => setPendingBuildRepair(null)}
+                    projectFiles={projectFiles}
+                    latestManifest={latestManifest}
+                    previewContext={latestPreviewContext}
+                    recentDeviceEvidence={latestDeviceEvidence}
+                    acceptanceState={acceptanceState}
+                    activeFile={activeFile}
+                    selectedSkills={selectedSkills}
+                    onSkillsChange={handleSkillsChange}
+                    onResetProject={resetProjectState}
+                  />
+                </div>
+              )}
               <div className={`right-tab-panel ${rightTab === 'log' ? 'active' : ''}`}>
                 <LogPanel
                   onDeviceEvidence={setLatestDeviceEvidence}
@@ -378,9 +386,12 @@ export default function App() {
                     })
                     setPendingLogAnalysis(`请帮我分析以下 ESP32 设备日志，找出问题原因并给出修复建议：\n\n\`\`\`\n${logs}\n\`\`\``)
                     setPendingBuildRepair(prev => prev ? { ...prev, recentDeviceEvidence: deviceRepairContext } : prev)
-                    setRightTab('chat')
+                    setRightTab(ENABLE_LEGACY_WEB_AGENT ? 'chat' : 'log')
                   }}
                 />
+              </div>
+              <div className={`right-tab-panel ${rightTab === 'mcp' ? 'active' : ''}`}>
+                <p>Local MCP server will expose compile, flash, preview, and evidence tools.</p>
               </div>
             </div>
           </div>
@@ -423,7 +434,7 @@ export default function App() {
                   })
                 : null,
             })
-            setRightTab('chat')
+            setRightTab(ENABLE_LEGACY_WEB_AGENT ? 'chat' : 'log')
           }}
           onClose={() => setShowCompile(false)}
         />
