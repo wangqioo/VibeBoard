@@ -7,6 +7,7 @@ import { listCapabilities, runHealth } from './tools/capabilities.mjs'
 import { compileProjectTool } from './tools/compileProject.mjs'
 import { getBuildEvidenceTool } from './tools/buildEvidence.mjs'
 import { renderLvglPreviewTool } from './tools/lvglPreview.mjs'
+import { flashUsbTool } from './tools/usbFlash.mjs'
 import { requireObject } from './tools/validate.mjs'
 
 const TOOL_HANDLERS = {
@@ -15,6 +16,7 @@ const TOOL_HANDLERS = {
   'vibeboard.compile_project': compileProjectTool,
   'vibeboard.get_build_evidence': getBuildEvidenceTool,
   'vibeboard.render_lvgl_preview': renderLvglPreviewTool,
+  'vibeboard.flash_usb': flashUsbTool,
 }
 
 export async function dispatchTool(name, input = {}, adapters = {}) {

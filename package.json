@@ -9,6 +9,7 @@
     "test:build-evidence": "node scripts/test-build-evidence.mjs",
     "test:mcp-compile-project": "node scripts/test-mcp-compile-project.mjs",
     "test:mcp-lvgl-preview": "node scripts/test-mcp-lvgl-preview.mjs",
+    "test:mcp-usb-flash": "node scripts/test-mcp-usb-flash.mjs",
     "mcp:server": "node backend/mcp-server/server.mjs",
     "test:mcp-server-capabilities": "node scripts/test-mcp-server-capabilities.mjs",
     "test:device-evidence": "node scripts/test-device-evidence.mjs",
