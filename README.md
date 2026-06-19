@@ -1,30 +1,32 @@
 # VibeBoard
 
-VibeBoard is an ESP-IDF-first AI hardware development workspace. It combines
-board context, natural-language firmware generation, official example builds,
-cloud ESP-IDF compilation, HTTPS Web Serial flashing, WiFi OTA, BLE OTA, and
-device feedback into one hardware workflow.
+VibeBoard is an ESP-IDF-first hardware console and local-agent integration layer.
+It gives local coding agents such as Codex and Claude Code structured access to
+board context, trusted project assembly, compiler services, firmware delivery,
+preview rendering, and build/device evidence through a local MCP server.
+
+The browser app is no longer the AI code-generation surface. It is the hardware
+console for compile status, flashing, OTA, logs, preview, and MCP activity.
 
 The current product focus is narrow by design:
 
 - Board family: SZPI / Lichuang ESP32-S3 first.
 - Framework: ESP-IDF v5.4 first.
-- Write boundary: AI writes application source under `main/`; VibeBoard owns
-  build files, BSP files, dependencies, sdkconfig, and partition tables.
+- Write boundary: local agents write application source under `main/`;
+  VibeBoard owns build files, BSP files, dependencies, sdkconfig, and partition
+  tables.
 - Secondary platform track: Huangshan Pi exists as an isolated workspace slice,
   not as a generalized board selector yet.
 
 ## Workflow
 
 ```text
-describe behavior or choose official example
-  -> select board capability skills
-  -> generate Program Manifest and application source
-  -> assemble system-owned ESP-IDF project files
-  -> build in compiler service
-  -> flash by USB / WiFi OTA / BLE OTA
-  -> collect build and device evidence
-  -> repair and rebuild
+Local coding agent
+  -> VibeBoard MCP tools
+  -> trusted board/project assembly
+  -> compiler / preview / delivery services
+  -> Build Evidence / Device Evidence
+  -> local agent repairs source files
 ```
 
 ## Start Here
@@ -63,6 +65,7 @@ development. Full local setup details are in
 | `src/domain/` | Program intent, manifest, workflow, evidence, digital twin, and Huangshan domain logic. |
 | `src/utils/` | Browser-side adapters for AI, compiler, flash, OTA, BLE, and validation. |
 | `backend/compiler-service/` | ESP-IDF build service and firmware build templates. |
+| `backend/mcp-server/` | Local stdio MCP server for Codex, Claude Code, and other local agents. |
 | `backend/lvgl-sim-service/` | LVGL simulation service boundary. |
 | `backend/huangshan-service/` | Huangshan Pi local service boundary. |
 | `deploy/` | Deployment config and HTTPS USB flashing notes. |
@@ -85,7 +88,6 @@ More focused test groups are listed in
 
 ## Hardware And Delivery Guides
 
-- [Huangshan Pi natural-language flow](./docs/huangshan-natural-language-flow.md)
 - [Huangshan Pi native architecture](./docs/huangshan-native-architecture.md)
 - [USB flashing](./docs/guides/flashing.md)
 - [WiFi, remote, and BLE OTA](./docs/guides/ota.md)

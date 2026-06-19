@@ -2,18 +2,22 @@
 
 ## Product Boundary
 
-VibeBoard is a natural-language hardware development workspace. The product goal
-is to let a user describe embedded behavior, generate board-aware ESP-IDF code,
-build firmware, deliver it to real hardware, inspect runtime feedback, and feed
-that feedback back into the assistant.
+VibeBoard is a hardware console plus local-agent integration layer. The product
+goal is to let local coding agents generate and repair firmware in the user's
+repo while VibeBoard provides trusted board context, ESP-IDF project assembly,
+compiler access, delivery operations, preview rendering, and structured
+build/device evidence.
+
+The web app does not host the AI coding agent. It displays and controls hardware
+operations. Local agents use VibeBoard through MCP tools.
 
 The current product line is intentionally narrow:
 
 - Board family: SZPI ESP32-S3 first.
 - Framework: ESP-IDF first.
 - Configuration ownership: VibeBoard owns build configuration and board support
-  files; AI writes application source files unless a future trusted workflow
-  explicitly expands the scope.
+  files; local agents write application source files unless a future trusted
+  workflow explicitly expands the scope.
 
 ## Domain Terms
 
@@ -45,7 +49,7 @@ is applied.
 **Application Source**
 
 Editable firmware source under `main/`, such as `main/main.c`, `main/ui.c`, or
-`main/wifi_app.h`. This is the normal AI write surface.
+`main/wifi_app.h`. This is the normal local-agent write surface.
 
 **System-Owned Project File**
 
@@ -72,9 +76,9 @@ logs, WebSocket logs, device info, crashes, resets, and user-observed symptoms.
 
 **Repair Loop**
 
-The post-failure workflow that uses Build Evidence or Device Evidence to patch
-Application Source, revalidate, rebuild, and rerun while preserving
-System-Owned Project Files.
+The post-failure workflow where a local agent uses Build Evidence or Device
+Evidence to patch Application Source, revalidate, rebuild, and rerun while
+preserving System-Owned Project Files.
 
 **Digital Twin**
 
@@ -88,13 +92,15 @@ calibrate the simulation.
 
 - The current Board Profile and Capability Skills live under
   `src/context/boards/szpi_esp32s3/`.
-- `src/utils/codeGeneration.js` already enforces JSON-only generated files.
+- `backend/mcp-server/` is the local stdio MCP server surface for Codex, Claude
+  Code, and other local agents.
+- `src/utils/codeGeneration.js` is legacy browser-generation support, not the
+  current product integration surface.
 - `src/utils/filePlacement.js` is the current write-surface guard.
 - `src/utils/projectAssembly.js` generates ESP-IDF project files from selected
   skills.
 - `backend/compiler-service/server.py` performs server-side ESP-IDF builds.
 - `docs/digital-twin-architecture.md` defines the fidelity ladder from
   semantic UI preview to real LVGL runtime and board-level peripheral mocks.
-- The next architectural step is to introduce Program Intent, Program Manifest,
-  Hardware Workflow, Build Evidence, and Device Evidence as explicit modules
-  instead of leaving them implicit inside UI components.
+- The current architecture is defined in
+  `docs/superpowers/specs/2026-06-19-agent-mcp-hardware-console-design.md`.

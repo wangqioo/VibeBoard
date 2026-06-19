@@ -6,14 +6,13 @@ README short; add details here.
 
 ## Reading Order
 
-1. [Project map](./project-map.md): repository layout, source ownership, and
-   current friction.
-2. [Context](../CONTEXT.md): product boundary and domain vocabulary.
-3. [Development plan](./development-plan.md): current roadmap and acceptance
+1. [Agent MCP hardware console design](./superpowers/specs/2026-06-19-agent-mcp-hardware-console-design.md): current architecture.
+2. [Project map](./project-map.md): repository structure and ownership boundaries.
+3. [Legacy web-agent archive](./archive/legacy-web-agent/): historical docs superseded by the MCP console pivot.
+4. [Context](../CONTEXT.md): product boundary and domain vocabulary.
+5. [Development plan](./development-plan.md): current roadmap and acceptance
    criteria.
-4. [Architecture](./architecture-natural-language-hardware-automation.md):
-   target product architecture for natural-language hardware automation.
-5. [Digital twin architecture](./digital-twin-architecture.md): preview fidelity
+6. [Digital twin architecture](./digital-twin-architecture.md): preview fidelity
    ladder from semantic preview to real LVGL and hardware evidence.
 
 ## Guides
@@ -28,6 +27,7 @@ README short; add details here.
 ## Architecture And Product Notes
 
 - [Agent skill integration](./agent-skill-integration.md)
+- [Agent MCP hardware console design](./superpowers/specs/2026-06-19-agent-mcp-hardware-console-design.md)
 - [LVGL preview runner](./lvgl-preview-runner.md)
 - [Agent domain notes](./agents/domain.md)
 - [Issue tracker agent notes](./agents/issue-tracker.md)
@@ -47,9 +47,9 @@ kept for reference.
 
 ## Plans And Specs
 
-- [Hardware workflow foundation plan](./superpowers/plans/2026-06-04-vibeboard-hardware-workflow-foundation.md)
 - [Huangshan workspace plan](./superpowers/plans/2026-06-09-huangshan-workspace.md)
-- [Architecture deepening spec](./superpowers/specs/2026-06-04-vibeboard-architecture-deepening-design.md)
+- [Agent MCP hardware console pivot plan](./superpowers/plans/2026-06-19-agent-mcp-hardware-console.md)
+- [Agent MCP hardware console design](./superpowers/specs/2026-06-19-agent-mcp-hardware-console-design.md)
 - [Huangshan workspace spec](./superpowers/specs/2026-06-09-huangshan-workspace-design.md)
 
 ## Business Material

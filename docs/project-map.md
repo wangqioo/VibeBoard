@@ -6,33 +6,33 @@ support, and which parts are local artifacts.
 
 ## Product Shape
 
-VibeBoard is an ESP-IDF-first hardware development workspace for the SZPI
-ESP32-S3 board family. The product workflow is:
+VibeBoard is an ESP-IDF-first hardware console and local-agent integration layer
+for the SZPI ESP32-S3 board family. The product workflow is:
 
 ```text
-User request
-  -> board-aware intent and skill selection
-  -> generated ESP-IDF application source
-  -> system-owned project assembly
-  -> compiler service build
-  -> USB / WiFi OTA / BLE OTA delivery
-  -> device evidence and repair loop
+Local coding agent
+  -> VibeBoard MCP tools
+  -> trusted board/project assembly
+  -> compiler / preview / delivery services
+  -> Build Evidence / Device Evidence
+  -> local agent repairs source files
 ```
 
 The important boundary is that VibeBoard owns board facts, BSP files, generated
-project configuration, partition tables, and compiler templates. AI writes
-application source under `main/` unless a future trusted workflow expands that
-surface.
+project configuration, partition tables, and compiler templates. Local agents
+write application source under `main/` unless a future trusted workflow expands
+that surface.
 
 ## Main Source Areas
 
 | Area | Purpose | Notes |
 | --- | --- | --- |
-| `src/` | Browser app | React/Vite frontend, project editor, chat, compile/flash panel, preview. |
+| `src/` | Browser hardware console | React/Vite frontend, project editor, compile/flash panel, preview, evidence, and MCP activity. |
 | `src/context/boards/` | Board Profile and Capability Skills | Hardware facts, prompt context, Driver Contracts, skill-driven project config. |
 | `src/domain/` | Product domain modules | Program Intent, Program Manifest, workflow outcomes, evidence, digital twin packages. |
 | `src/utils/` | Browser-side adapters and assembly utilities | AI API, compiler calls, OTA/USB/BLE flash clients, source validation, project assembly. |
 | `backend/compiler-service/` | ESP-IDF build service | Builds generated projects, official examples, WiFi OTA receiver, BLE OTA receiver. |
+| `backend/mcp-server/` | Local stdio MCP server | Tool surface for Codex, Claude Code, and other local agents. |
 | `backend/compiler-service/template/` | Generated project template | System-owned ESP-IDF files and SZPI BSP copied into generated projects. |
 | `backend/compiler-service/examples/` | Official SZPI examples | Compiled as original examples, not rewritten by AI. |
 | `backend/compiler-service/ota_receiver/` | WiFi OTA base firmware | First-stage firmware for WiFi logs, local OTA, and remote OTA pull flow. |
@@ -111,7 +111,7 @@ tracked area such as `docs/business/`, `business-site/`, or a future
    `backend/compiler-service/ble_ota_receiver/`, and the sparse-hidden
    `hardware/ota-firmware/`.
 3. Browser-side adapters in `src/utils/` mix several levels:
-   project assembly, transport clients, AI API access, and validation.
+   project assembly, transport clients, legacy AI API access, and validation.
 4. Several major product concepts are documented in `CONTEXT.md` but are still
    partially implicit in UI components.
 
@@ -127,10 +127,10 @@ being actively debugged.
    `hardware/ota-firmware/` is obsolete or should replace the receiver folders
    under `backend/compiler-service/`.
 3. Split `src/utils/` by adapter role:
-   `src/adapters/ai/`, `src/adapters/compiler/`, `src/adapters/flash/`, and keep
+   `src/adapters/compiler/`, `src/adapters/flash/`, `src/adapters/mcp/`, and keep
    pure project assembly/validation close to `src/domain/`.
-4. Promote Build Evidence and Device Evidence into first-class workflow inputs
-   so repair flows do not depend on component-local state.
+4. Promote Build Evidence and Device Evidence into first-class MCP outputs so
+   local-agent repair flows do not depend on component-local state.
 
 ## Fast Orientation Commands
 
