@@ -1,6 +1,9 @@
 import { resolve } from 'node:path'
 
-import { writeCompileArtifacts } from './artifacts.mjs'
+import {
+  writeBuildEvidenceRecord,
+  writeCompileArtifacts,
+} from './artifacts.mjs'
 import { compileProjectWithService } from './compilerClient.mjs'
 import { requireObject } from './validate.mjs'
 import { readWorkspaceProjectFiles } from './workspaceFiles.mjs'
@@ -47,15 +50,34 @@ function invalidCompilePackage({ error, diagnostics, mainFile = null, selectedSk
   }
 }
 
+async function persistBuildEvidence({
+  artifactDir,
+  projectId,
+  result,
+}) {
+  await writeBuildEvidenceRecord({
+    artifactDir,
+    projectId,
+    status: result.status,
+    buildEvidence: result.buildEvidence,
+    artifact: result.artifact,
+    diagnostics: result.diagnostics,
+    logs: result.logs,
+    compilePackage: result.compilePackage,
+  })
+}
+
 export async function compileProjectTool(input = {}, adapters = {}) {
   const params = requireObject(input)
   if (!params.workspacePath) throw new Error('workspacePath is required')
   if (!params.boardId) throw new Error('boardId is required')
 
   const selectedSkills = normalizeSelectedSkills(params.selectedSkills)
+  const projectId = params.projectId || params.boardId || 'project'
+  const artifactDir = adapters.artifactDir || params.artifactDir || defaultArtifactDir()
 
   if (!SUPPORTED_BOARD_IDS.has(params.boardId)) {
-    return invalidCompilePackage({
+    const result = invalidCompilePackage({
       error: `unsupported boardId: ${params.boardId}`,
       diagnostics: [{
         category: 'unsupported-board',
@@ -63,13 +85,15 @@ export async function compileProjectTool(input = {}, adapters = {}) {
       }],
       selectedSkills,
     })
+    await persistBuildEvidence({ artifactDir, projectId, result })
+    return result
   }
 
   const projectFiles = await readWorkspaceProjectFiles({ workspacePath: params.workspacePath })
   const mainFile = detectMainFile(projectFiles)
 
   if (!mainFile) {
-    return invalidCompilePackage({
+    const result = invalidCompilePackage({
       error: 'missing entry file: main/main.c or main/main.cpp',
       diagnostics: [{
         category: 'missing-entry-file',
@@ -77,9 +101,10 @@ export async function compileProjectTool(input = {}, adapters = {}) {
       }],
       selectedSkills,
     })
+    await persistBuildEvidence({ artifactDir, projectId, result })
+    return result
   }
 
-  const projectId = params.projectId || params.boardId
   const compileResult = await compileProjectWithService({
     compilerUrl: adapters.compilerUrl || params.compilerUrl,
     payload: {
@@ -95,7 +120,7 @@ export async function compileProjectTool(input = {}, adapters = {}) {
   })
 
   if (compileResult.status !== 'success') {
-    return {
+    const result = {
       status: 'failure',
       artifact: null,
       buildEvidence: compileResult.buildEvidence,
@@ -106,16 +131,18 @@ export async function compileProjectTool(input = {}, adapters = {}) {
         selectedSkills,
       },
     }
+    await persistBuildEvidence({ artifactDir, projectId, result })
+    return result
   }
 
   const artifact = await writeCompileArtifacts({
-    artifactDir: adapters.artifactDir || params.artifactDir || defaultArtifactDir(),
+    artifactDir,
     projectId,
     firmware: compileResult.firmware,
     flashFiles: compileResult.flashFiles,
   })
 
-  return {
+  const result = {
     status: 'success',
     artifact,
     buildEvidence: compileResult.buildEvidence,
@@ -126,4 +153,6 @@ export async function compileProjectTool(input = {}, adapters = {}) {
       selectedSkills,
     },
   }
+  await persistBuildEvidence({ artifactDir, projectId, result })
+  return result
 }

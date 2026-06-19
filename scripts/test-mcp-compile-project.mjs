@@ -7,6 +7,7 @@ import {
   readWorkspaceProjectFiles,
 } from '../backend/mcp-server/tools/workspaceFiles.mjs'
 import {
+  readBuildEvidenceRecord,
   writeCompileArtifacts,
 } from '../backend/mcp-server/tools/artifacts.mjs'
 import {
@@ -193,6 +194,43 @@ assert.deepEqual(toolResult.compilePackage, {
   selectedSkills: ['display', 'wifi_6'],
 })
 
+const persistedSuccessEvidence = await readBuildEvidenceRecord({
+  artifactDir: toolArtifactDir,
+  projectId: 'tool-project',
+})
+assert.equal(persistedSuccessEvidence.status, 'success')
+assert.equal(persistedSuccessEvidence.projectId, 'tool-project')
+assert.equal(persistedSuccessEvidence.buildEvidence.status, 'success')
+assert.equal(persistedSuccessEvidence.artifact.firmware.size, 8)
+assert.equal(persistedSuccessEvidence.compilePackage.mainFile, 'main.c')
+
+const failureWorkspace = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-failure-'))
+await mkdir(join(failureWorkspace, 'main'), { recursive: true })
+await writeFile(join(failureWorkspace, 'main', 'main.c'), 'void app_main(void) {}')
+
+const failedToolResult = await compileProjectTool({
+  workspacePath: failureWorkspace,
+  boardId: 'szpi_esp32s3',
+  selectedSkills: [],
+  projectId: 'project-failure',
+  compilerUrl: 'http://compiler.local',
+  artifactDir: toolArtifactDir,
+}, {
+  fetchImpl: async () => sseResponse([
+    'data: {"log":"compile failed"}\n\n',
+    'data: {"done":true,"error":"bad source"}\n\n',
+  ]),
+})
+assert.equal(failedToolResult.status, 'failure')
+
+const persistedFailureEvidence = await readBuildEvidenceRecord({
+  artifactDir: toolArtifactDir,
+  projectId: 'project-failure',
+})
+assert.equal(persistedFailureEvidence.status, 'failure')
+assert.equal(persistedFailureEvidence.buildEvidence.error, 'bad source')
+assert.equal(persistedFailureEvidence.artifact, null)
+
 const cppWorkspace = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-cpp-workspace-'))
 await mkdir(join(cppWorkspace, 'main'), { recursive: true })
 await writeFile(join(cppWorkspace, 'main', 'main.c'), 'void legacy(void) {}')
@@ -225,22 +263,40 @@ assert.equal(cppResult.compilePackage.mainFile, 'main.cpp')
 const missingMainWorkspace = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-no-main-'))
 await mkdir(join(missingMainWorkspace, 'components', 'demo'), { recursive: true })
 await writeFile(join(missingMainWorkspace, 'components', 'demo', 'demo.c'), 'void demo(void) {}')
+const missingMainArtifactDir = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-no-main-artifacts-'))
 const missingMainResult = await compileProjectTool({
   workspacePath: missingMainWorkspace,
   boardId: 'szpi_esp32s3',
+  projectId: 'missing-main-project',
+  artifactDir: missingMainArtifactDir,
 })
 assert.equal(missingMainResult.status, 'failure')
 assert.equal(missingMainResult.artifact, null)
 assert.equal(missingMainResult.buildEvidence.status, 'failure')
 assert.equal(missingMainResult.buildEvidence.category, 'compile-package-invalid')
+const persistedMissingMainEvidence = await readBuildEvidenceRecord({
+  artifactDir: missingMainArtifactDir,
+  projectId: 'missing-main-project',
+})
+assert.equal(persistedMissingMainEvidence.status, 'failure')
+assert.equal(persistedMissingMainEvidence.diagnostics[0].category, 'missing-entry-file')
 
+const unsupportedBoardArtifactDir = await mkdtemp(join(tmpdir(), 'vibeboard-mcp-unsupported-artifacts-'))
 const unsupportedBoardResult = await compileProjectTool({
   workspacePath: workspace,
   boardId: 'unsupported',
+  projectId: 'unsupported-project',
+  artifactDir: unsupportedBoardArtifactDir,
 })
 assert.equal(unsupportedBoardResult.status, 'failure')
 assert.equal(unsupportedBoardResult.artifact, null)
 assert.equal(unsupportedBoardResult.buildEvidence.category, 'compile-package-invalid')
+const persistedUnsupportedBoardEvidence = await readBuildEvidenceRecord({
+  artifactDir: unsupportedBoardArtifactDir,
+  projectId: 'unsupported-project',
+})
+assert.equal(persistedUnsupportedBoardEvidence.status, 'failure')
+assert.equal(persistedUnsupportedBoardEvidence.diagnostics[0].category, 'unsupported-board')
 
 await assert.rejects(
   () => compileProjectTool(null),

@@ -1,8 +1,49 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-function safeName(name, fallback) {
+export function safeName(name, fallback) {
   return String(name || fallback).replace(/[^A-Za-z0-9_.-]/g, '_')
+}
+
+export function projectArtifactDir(artifactDir, projectId = 'project') {
+  if (!artifactDir) throw new Error('artifactDir is required')
+  return join(artifactDir, safeName(projectId, 'project'))
+}
+
+export async function writeBuildEvidenceRecord({
+  artifactDir,
+  projectId,
+  status,
+  buildEvidence,
+  artifact = null,
+  diagnostics = [],
+  logs = [],
+  compilePackage = null,
+} = {}) {
+  const projectDir = projectArtifactDir(artifactDir, projectId)
+  await mkdir(projectDir, { recursive: true })
+
+  const record = {
+    schemaVersion: 1,
+    projectId: projectId || 'project',
+    status,
+    buildEvidence,
+    artifact,
+    diagnostics,
+    logs,
+    compilePackage,
+    updatedAt: new Date().toISOString(),
+  }
+  const path = join(projectDir, 'build-evidence.json')
+  await writeFile(path, JSON.stringify(record, null, 2))
+  return { ...record, path }
+}
+
+export async function readBuildEvidenceRecord({ artifactDir, projectId } = {}) {
+  if (!projectId) throw new Error('projectId is required')
+  const path = join(projectArtifactDir(artifactDir, projectId), 'build-evidence.json')
+  const raw = await readFile(path, 'utf8')
+  return { ...JSON.parse(raw), path }
 }
 
 export async function writeCompileArtifacts({
@@ -11,10 +52,9 @@ export async function writeCompileArtifacts({
   firmware,
   flashFiles = [],
 } = {}) {
-  if (!artifactDir) throw new Error('artifactDir is required')
   if (!firmware?.base64) throw new Error('firmware base64 is required')
 
-  const projectDir = join(artifactDir, safeName(projectId, 'project'))
+  const projectDir = projectArtifactDir(artifactDir, projectId)
   await mkdir(projectDir, { recursive: true })
 
   const firmwareName = safeName(firmware.filename, 'firmware.bin')
