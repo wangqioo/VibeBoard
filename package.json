@@ -11,6 +11,7 @@
     "test:device-evidence-bridge": "node scripts/test-device-evidence-bridge.mjs",
     "test:compile-panel-delivery-evidence": "node scripts/test-compile-panel-delivery-evidence.mjs",
     "test:compile-panel-build-evidence-ui": "node scripts/test-compile-panel-build-evidence-ui.mjs",
+    "test:no-legacy-web-agent-docs": "node scripts/test-no-legacy-web-agent-docs.mjs",
     "test:agent-adapter": "node scripts/test-agent-adapter.mjs",
     "test:code-generation": "node scripts/test-code-generation.mjs",
     "test:generation-pipeline": "node scripts/test-generation-pipeline.mjs",
