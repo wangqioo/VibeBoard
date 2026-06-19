@@ -1,3 +1,5 @@
+> Legacy document: superseded by `docs/superpowers/specs/2026-06-19-agent-mcp-hardware-console-design.md`. This file is retained for historical context only. Do not use it as current implementation guidance.
+
 # VibeBoard Architecture Deepening Design
 
 Date: 2026-06-04
