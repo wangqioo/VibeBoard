@@ -1,22 +1,33 @@
 # VibeBoard
 
-VibeBoard is an ESP-IDF-first hardware console and local-agent integration layer.
-It gives local coding agents such as Codex and Claude Code structured access to
-board context, trusted project assembly, compiler services, firmware delivery,
-preview rendering, and build/device evidence through a local MCP server.
+VibeBoard is a local-agent hardware execution and verification console. Local
+coding agents such as Codex and Claude Code edit firmware in the user's repo;
+VibeBoard provides the board context, MCP tools, compiler services, local
+bridge flows, flashing, preview rendering, logs, readback verification, and
+evidence reports that prove what actually ran on hardware.
 
-The browser app is no longer the AI code-generation surface. It is the hardware
-console for compile status, flashing, OTA, logs, preview, and MCP activity.
+The browser app is not the AI code-generation surface. It is the hardware
+console for compile status, flashing, OTA, local bridge readiness, logs,
+preview, readback verification, evidence export, and MCP activity.
+
+Public deployment:
+
+```text
+http://150.158.146.192:6054/
+```
 
 The current product focus is narrow by design:
 
-- Board family: SZPI / Lichuang ESP32-S3 first.
-- Framework: ESP-IDF v5.4 first.
-- Write boundary: local agents write application source under `main/`;
-  VibeBoard owns build files, BSP files, dependencies, sdkconfig, and partition
-  tables.
-- Secondary platform track: Huangshan Pi exists as an isolated workspace slice,
-  not as a generalized board selector yet.
+- ESP32-S3: compile, USB / OTA delivery, device evidence, and evidence report
+  export.
+- Huangshan Pi / SiFli SF32LB52: server/local bridge compile, local bridge
+  flash, LVGL preview, serial monitor, flash readback verification, and
+  evidence report export.
+- Nordic nRF52840: visible as an experimental/basic workspace, not yet the same
+  sellable full verification path as ESP32-S3 and Huangshan Pi.
+- Write boundary: local agents write application source; VibeBoard owns trusted
+  board/project assembly, build files, BSP files, dependencies, sdkconfig, flash
+  metadata, and evidence.
 
 ## Workflow
 
@@ -24,8 +35,9 @@ The current product focus is narrow by design:
 Local coding agent
   -> VibeBoard MCP tools
   -> trusted board/project assembly
-  -> compiler / preview / delivery services
-  -> Build Evidence / Device Evidence
+  -> compiler / preview / delivery / bridge services
+  -> Build Evidence / Flash Evidence / Device Evidence / Preview Evidence
+  -> exported evidence report
   -> local agent repairs source files
 ```
 
@@ -76,6 +88,10 @@ development. Full local setup details are in
 
 ```bash
 npm run build
+npm run test:evidence-package
+npm run test:no-web-code-generation-ui
+npm run test:no-legacy-web-agent-docs
+npm run test:huangshan-device-actions
 npm run test:compile-package
 npm run test:compiler-security
 npm run test:project-validation
@@ -88,6 +104,9 @@ More focused test groups are listed in
 
 ## Hardware And Delivery Guides
 
+- [ESP32-S3 5 minute demo](./docs/guides/esp32-s3-5-minute-demo.md)
+- [Huangshan Pi 5 minute demo](./docs/guides/huangshan-pi-5-minute-demo.md)
+- [Sales demo](./docs/guides/sales-demo.md)
 - [Huangshan Pi native architecture](./docs/huangshan-native-architecture.md)
 - [USB flashing](./docs/guides/flashing.md)
 - [WiFi, remote, and BLE OTA](./docs/guides/ota.md)

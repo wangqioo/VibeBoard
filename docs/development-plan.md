@@ -187,24 +187,23 @@ Local coding agent edits firmware
 
 ### Phase 5: Evidence Reports
 
+**Status:** implemented for the current MVP.
+
 **Goal:** make verification the product differentiator.
 
-- Define `BuildEvidence`, `FlashEvidence`, `DeviceEvidence`, and
-  `PreviewEvidence` as user-facing concepts.
-- Add a run history model for each workflow attempt.
-- Show artifact metadata:
+- `BuildEvidence`, `FlashEvidence`, `DeviceEvidence`, and `PreviewEvidence`
+  are now user-facing concepts.
+- ESP32-S3 can export build/device/artifact evidence from the compile panel.
+- Huangshan Pi can export build/preview/readback/artifact evidence from the
+  workspace.
+- Artifact metadata includes:
   - file name
   - size
   - SHA256
   - flash address when relevant
   - source fingerprint or commit
-- Show tool metadata:
-  - compiler toolchain
-  - flasher command
-  - bridge/server target
-  - board profile
-  - elapsed time
-- Export a single markdown or JSON report for a completed run.
+- A single markdown report can be exported for completed or partially completed
+  runs.
 
 **Acceptance:**
 
@@ -214,12 +213,14 @@ Local coding agent edits firmware
 
 ### Phase 6: Onboarding And Sales Demo
 
+**Status:** implemented for the current MVP.
+
 **Goal:** make a buyer understand and run the product in minutes.
 
-- Add a "5 minute ESP32-S3 demo" guide.
-- Add a "5 minute Huangshan Pi demo" guide.
-- Add bridge install/start instructions for macOS first.
-- Add a short sales demo script:
+- Added [ESP32-S3 5 minute demo](./guides/esp32-s3-5-minute-demo.md).
+- Added [Huangshan Pi 5 minute demo](./guides/huangshan-pi-5-minute-demo.md).
+- Added [Sales demo](./guides/sales-demo.md).
+- The sales script demonstrates:
   1. open VibeBoard
   2. start local bridge
   3. attach board
@@ -227,8 +228,8 @@ Local coding agent edits firmware
   5. flash
   6. verify
   7. export evidence
-- Update business material to sell the hardware verification layer, not browser
-  AI coding.
+- Business material now sells the hardware execution and verification layer, not
+  browser AI coding.
 
 **Acceptance:**
 
@@ -241,15 +242,19 @@ Local coding agent edits firmware
 ### Bridge
 
 - `backend/huangshan-service/`: keep as the first concrete local bridge.
-- Add shared health schema and tests.
-- Consider a unified bridge entrypoint once ESP and Huangshan contracts match.
+- Huangshan health now reports bridge mode, SDK checks, `sftool`, serial port,
+  status, and issues.
+- Next: consider a unified bridge entrypoint once ESP and Huangshan contracts
+  match.
 
 ### Web Console
 
-- `src/components/HuangshanWorkspace.*`: promote bridge state and readback
-  verification.
-- ESP compile/flash panels: add the same bridge-state vocabulary.
-- `src/components/McpPanel.jsx`: show tool status and recent evidence.
+- `src/components/HuangshanWorkspace.*`: bridge state, readback verification,
+  flash evidence, and report export are implemented.
+- ESP compile/flash panels: build evidence, delivery evidence, and report
+  export are implemented.
+- Next: add the same bridge-state vocabulary to ESP local bridge surfaces.
+- Next: show recent evidence in `src/components/McpPanel.jsx`.
 
 ### MCP
 
@@ -265,15 +270,27 @@ Local coding agent edits firmware
   reading path.
 - Guides should be task-based, not architecture essays.
 
-## Near-Term Implementation Order
+## Completed MVP Implementation
 
-1. Audit active docs and UI labels for stale browser-agent language.
-2. Add a shared bridge status vocabulary and Huangshan bridge health UI.
-3. Add Huangshan readback verification to the web UI.
-4. Add ESP32-S3 device verification parity.
-5. Add evidence report export.
-6. Add two 5-minute demo guides.
-7. Update business material around the hardware verification console thesis.
+1. Audited active docs and UI labels for stale browser-agent language.
+2. Added Huangshan bridge status vocabulary and health UI.
+3. Added Huangshan readback verification to the web UI.
+4. Added ESP32-S3 build/device evidence parity and report export.
+5. Added Huangshan and ESP evidence report export.
+6. Added 5-minute demo guides and a sales demo.
+7. Updated business material around the hardware verification console thesis.
+8. Deployed the current web console to `http://150.158.146.192:6054/`.
+
+## Remaining Productization Work
+
+1. Productize a unified local bridge installer/launcher.
+2. Add ESP-specific bridge readiness UI where local USB flashing is used.
+3. Add run history so multiple reports can be compared without relying on a
+   downloaded markdown file.
+4. Decide whether Nordic should graduate from experimental workspace to
+   evidence-backed sellable path.
+5. Add packaging/signing/distribution for the local bridge if selling to
+   non-developer customers.
 
 ## Verification Commands
 
