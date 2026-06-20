@@ -18,6 +18,8 @@ const files = createHuangshanAppFiles({
 
 assert.ok(files['src/gui_apps/Board_Diagnostics/main.c'].includes('#define APP_ID "board_diagnostics"'))
 assert.ok(files['src/gui_apps/Board_Diagnostics/main.c'].includes('BUILTIN_APP_EXPORT'))
+assert.ok(files['src/gui_apps/Board_Diagnostics/main.c'].includes('BUILTIN_APP_EXPORT(LV_EXT_STR_ID(lckfb), LV_EXT_IMG_GET(img_LiChuang), APP_ID, msg_handler);'))
+assert.doesNotMatch(files['src/gui_apps/Board_Diagnostics/main.c'], /LV_EXT_STR_ID\(board_diagnostics\)/)
 assert.ok(files['src/gui_apps/Board_Diagnostics/main.c'].includes('GUI_APP_MSG_ONSTART'))
 assert.ok(files['src/gui_apps/Board_Diagnostics/main.c'].includes('rt_kprintf("[Board_Diagnostics] start'))
 assert.ok(files['src/gui_apps/Board_Diagnostics/SConscript'].includes("src = Glob('*.c')"))
