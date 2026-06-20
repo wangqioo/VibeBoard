@@ -58,6 +58,14 @@ function firstExistingPath(candidates) {
   return candidates.find(candidate => candidate && existsSync(candidate)) || candidates.find(Boolean)
 }
 
+function resolveSftoolPath({ env = process.env } = {}) {
+  if (env.SIFLI_SFTOOL_PATH) return env.SIFLI_SFTOOL_PATH
+  return firstExistingPath([
+    join(homedir(), '.sifli/tools/sftool/0.1.16/sftool'),
+    'sftool',
+  ])
+}
+
 function resolveWorkspace({ env = process.env, platform = process.platform } = {}) {
   const home = homedir()
   const workspace = resolve(env.HUANGSHAN_WORKSPACE || firstExistingPath([
@@ -202,16 +210,41 @@ function createHuangshanMonitorSetupCommand({ port, baud = 921600, platform = pr
   }
 }
 
-function healthPayload() {
-  const paths = resolveWorkspace()
+function createBridgeStatus({ checks }) {
+  const issues = []
+  if (!checks.buildScript || !checks.sdkExport) issues.push('missing-sdk')
+  if (!checks.sftool) issues.push('missing-flasher')
+  if (!checks.serialPort) issues.push('no-device')
+  if (issues.includes('missing-sdk')) return { mode: 'local', status: 'missing-sdk', issues }
+  if (issues.includes('missing-flasher')) return { mode: 'local', status: 'missing-flasher', issues }
+  if (issues.includes('no-device')) return { mode: 'local', status: 'no-device', issues }
+  return { mode: 'local', status: 'device-ready', issues }
+}
+
+function healthPayload({ env = process.env, platform = process.platform, devices } = {}) {
+  const paths = resolveWorkspace({ env, platform })
+  const serialPorts = listHuangshanSerialPorts({ platform, devices })
+  const sftoolPath = resolveSftoolPath({ env })
+  const checks = {
+    buildScript: existsSync(paths.buildScript),
+    sdkExport: existsSync(paths.sdkExport),
+    sftool: existsSync(sftoolPath),
+    serialPort: serialPorts.length > 0,
+  }
   return {
     service: 'huangshan-service',
+    boardFamily: 'huangshan',
     workspace: paths.workspace,
     sdk: paths.sdk,
-    ok: existsSync(paths.buildScript) && existsSync(paths.sdkExport),
-    checks: {
-      buildScript: existsSync(paths.buildScript),
-      sdkExport: existsSync(paths.sdkExport),
+    ok: checks.buildScript && checks.sdkExport,
+    bridge: createBridgeStatus({ checks }),
+    checks,
+    serialPorts,
+    tools: {
+      sftool: {
+        path: sftoolPath,
+        ok: checks.sftool,
+      },
     },
   }
 }

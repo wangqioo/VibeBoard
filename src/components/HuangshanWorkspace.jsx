@@ -53,6 +53,41 @@ function normalizeBridgeUrl(value) {
   return String(value || '').trim().replace(/\/+$/, '')
 }
 
+function bridgeStatusLabel(status) {
+  if (status === 'device-ready') return '设备就绪'
+  if (status === 'no-device') return '未发现设备'
+  if (status === 'missing-flasher') return '缺少 sftool'
+  if (status === 'missing-sdk') return '缺少 SDK'
+  if (status === 'server') return '服务器模式'
+  return '未启动'
+}
+
+function checkStatusText(value) {
+  return value ? '就绪' : '缺失'
+}
+
+function createHuangshanBridgeStatus(health, baseUrl) {
+  if (!baseUrl) {
+    return {
+      status: health?.ok ? 'server' : 'offline',
+      label: health?.ok ? bridgeStatusLabel('server') : bridgeStatusLabel('offline'),
+      checks: [],
+      issues: health?.ok ? [] : ['server-offline'],
+    }
+  }
+  const status = health?.bridge?.status || (health?.ok ? 'connected' : 'offline')
+  return {
+    status,
+    label: bridgeStatusLabel(status),
+    checks: [
+      { id: 'sdk', label: 'SDK', ok: Boolean(health?.checks?.buildScript && health?.checks?.sdkExport) },
+      { id: 'sftool', label: 'sftool', ok: Boolean(health?.checks?.sftool) },
+      { id: 'serial', label: '串口', ok: Boolean(health?.checks?.serialPort) },
+    ],
+    issues: health?.bridge?.issues || [],
+  }
+}
+
 export default function HuangshanWorkspace({ settings, onOpenSettings }) {
   const [appDisplayName, setAppDisplayName] = useState('传感器仪表盘')
   const [description, setDescription] = useState('显示黄山派真实传感器和 ADC 读数。')
@@ -91,6 +126,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
 
   const appName = useMemo(() => normalizeHuangshanAppName(appDisplayName), [appDisplayName])
   const huangshanServiceBaseUrl = useMemo(() => normalizeBridgeUrl(bridgeUrl), [bridgeUrl])
+  const bridgeStatus = createHuangshanBridgeStatus(health, huangshanServiceBaseUrl)
   const capabilities = useMemo(() => listHuangshanCapabilities(), [])
   const preview = useMemo(() => createHuangshanSemanticPreview({
     displayName: appDisplayName,
@@ -409,6 +445,21 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
         </div>
 
         <div className="huangshan-device-compact">
+          <div className={`huangshan-bridge-card ${bridgeStatus.status}`}>
+            <div className="huangshan-bridge-card-head">
+              <span>Bridge</span>
+              <strong className="huangshan-bridge-state">{bridgeStatus.label}</strong>
+            </div>
+            {bridgeStatus.checks.length > 0 && (
+              <div className="huangshan-bridge-checks">
+                {bridgeStatus.checks.map(check => (
+                  <span key={check.id} className={`huangshan-bridge-check ${check.ok ? 'ok' : 'error'}`}>
+                    {check.label} {checkStatusText(check.ok)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <label>
             Bridge
             <input
