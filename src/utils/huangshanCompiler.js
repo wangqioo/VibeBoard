@@ -66,6 +66,7 @@ async function runHuangshanStream({ url, baseUrl, method = 'POST', body, initial
           elapsedMs: msg.elapsedMs || Date.now() - startedAt,
         })
         evidence.artifactSummary = msg.artifactSummary || { artifacts: [] }
+        evidence.flashEvidence = msg.flashEvidence || null
         if (msg.error) {
           const error = new Error(msg.error)
           error.buildEvidence = evidence
@@ -125,4 +126,16 @@ export async function flashHuangshanWorkspace({ port, onStatus, onLog, baseUrl }
     onLog,
   })
   return result.evidence
+}
+
+export async function verifyHuangshanReadback({ port, onStatus, onLog, baseUrl } = {}) {
+  const result = await runHuangshanStream({
+    url: '/huangshan/verify-readback',
+    baseUrl,
+    body: { port },
+    initialStatus: 'Connecting Huangshan readback verifier...',
+    onStatus,
+    onLog,
+  })
+  return result.evidence.flashEvidence
 }

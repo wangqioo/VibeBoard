@@ -194,6 +194,60 @@
   color: var(--red);
 }
 
+.huangshan-flash-evidence {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+}
+
+.huangshan-flash-evidence-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.huangshan-flash-evidence-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border-muted);
+  font-size: 11px;
+}
+
+.huangshan-flash-evidence-row strong,
+.huangshan-flash-evidence-row span {
+  display: block;
+}
+
+.huangshan-flash-evidence-row span {
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.huangshan-flash-evidence-row.matched {
+  border-color: rgba(52, 211, 153, 0.28);
+}
+
+.huangshan-flash-evidence-row.mismatch {
+  border-color: rgba(248, 113, 113, 0.36);
+}
+
+.huangshan-flash-evidence-row.matched code {
+  color: var(--accent-hover);
+}
+
+.huangshan-flash-evidence-row.mismatch code {
+  color: var(--red);
+}
+
 .huangshan-section textarea {
   min-height: 70px;
   resize: vertical;

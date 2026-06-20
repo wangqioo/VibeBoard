@@ -1,5 +1,6 @@
 import http from 'node:http'
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -13,6 +14,11 @@ const SERVICE_DIR = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(SERVICE_DIR, '../..')
 const REPO_PARENT = resolve(REPO_ROOT, '..')
 const PREVIEW_RUNNER_DIR = join(REPO_ROOT, 'backend/compiler-service/preview_runner')
+const HUANGSHAN_FLASH_ARTIFACTS = [
+  { name: 'main.bin', address: '0x12020000' },
+]
+const HUANGSHAN_READBACK_CHUNK_SIZE = 256 * 1024
+const HUANGSHAN_READBACK_MAX_ATTEMPTS = 3
 
 function json(res, status, payload) {
   res.writeHead(status, corsHeaders({ 'Content-Type': 'application/json' }))
@@ -175,11 +181,16 @@ function createHuangshanArtifactSummary({ workspace }) {
         kind,
         relativePath,
         size: statSync(absolutePath).size,
+        sha256: createFileSha256(absolutePath),
       }
     })
     .filter(Boolean)
 
   return { buildDir, artifacts }
+}
+
+function createFileSha256(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex')
 }
 
 function createHuangshanFlashCommand({ port, buildDir }) {
@@ -200,6 +211,60 @@ function createHuangshanFlashCommand({ port, buildDir }) {
     ],
     cwd: buildDir,
   }
+}
+
+function createHuangshanReadbackVerifyCommand({ port, buildDir, outputDir, artifact }) {
+  assertSafeSerialPort(port)
+  if (!artifact?.name || !artifact?.address || !Number.isFinite(Number(artifact.size)) || Number(artifact.size) <= 0) {
+    throw new Error('Invalid Huangshan readback artifact')
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(artifact.name)) {
+    throw new Error(`Unsafe Huangshan readback artifact: ${artifact.name}`)
+  }
+  const outputPath = join(outputDir, artifact.name)
+  return {
+    command: 'sftool',
+    args: [
+      '-p',
+      port,
+      '-c',
+      'SF32LB52',
+      '-m',
+      'nor',
+      'read_flash',
+      `${outputPath}@${artifact.address}:${Number(artifact.size)}`,
+    ],
+    cwd: buildDir,
+    outputPath,
+    expectedSha256: artifact.sha256,
+    artifact,
+  }
+}
+
+function createHuangshanReadbackChunks({ artifact, chunkSize = HUANGSHAN_READBACK_CHUNK_SIZE }) {
+  if (!artifact?.name || !artifact?.address || !Number.isFinite(Number(artifact.size)) || Number(artifact.size) <= 0) {
+    throw new Error('Invalid Huangshan readback artifact')
+  }
+  const baseAddress = Number.parseInt(String(artifact.address), 16)
+  if (!Number.isFinite(baseAddress)) throw new Error(`Invalid Huangshan readback address: ${artifact.address}`)
+  const chunks = []
+  let offset = 0
+  let index = 0
+  const totalSize = Number(artifact.size)
+  while (offset < totalSize) {
+    const size = Math.min(chunkSize, totalSize - offset)
+    chunks.push({
+      ...artifact,
+      name: `${artifact.name}.part${String(index).padStart(3, '0')}`,
+      sourceName: artifact.name,
+      address: `0x${(baseAddress + offset).toString(16)}`,
+      size,
+      offset,
+    })
+    offset += size
+    index += 1
+  }
+  return chunks
 }
 
 function createHuangshanMonitorSetupCommand({ port, baud = 921600, platform = process.platform }) {
@@ -445,6 +510,139 @@ function runFlash(res, { port }) {
   })
 }
 
+function runReadbackVerify(res, { port }) {
+  const paths = resolveWorkspace()
+  const artifactSummary = createHuangshanArtifactSummary(paths)
+  const buildDir = artifactSummary.buildDir
+  const artifactsByName = new Map(artifactSummary.artifacts.map(item => [item.name, item]))
+  const targets = HUANGSHAN_FLASH_ARTIFACTS
+    .map(target => {
+      const artifact = artifactsByName.get(target.name)
+      return artifact ? { ...artifact, address: target.address } : null
+    })
+    .filter(Boolean)
+
+  if (targets.length === 0) {
+    sse(res, { done: true, status: 'failure', error: 'Missing build artifacts for readback verification' })
+    res.end()
+    return
+  }
+
+  let index = 0
+  const startedAt = Date.now()
+  const outputDir = join(buildDir, '.vibeboard-readback')
+  mkdirSync(outputDir, { recursive: true })
+  const results = []
+  let chunkQueue = []
+  let activeArtifact = null
+  let activeHash = null
+
+  function runNext() {
+    if (chunkQueue.length === 0) {
+      if (activeArtifact && activeHash) {
+        const actualSha256 = activeHash.digest('hex')
+        const matched = actualSha256 === activeArtifact.sha256
+        results.push({
+          name: activeArtifact.name,
+          address: activeArtifact.address,
+          size: activeArtifact.size,
+          expectedSha256: activeArtifact.sha256,
+          actualSha256,
+          matched,
+        })
+        sse(res, { log: `${activeArtifact.name} ${matched ? 'verified' : 'mismatch'} ${actualSha256}` })
+        activeArtifact = null
+        activeHash = null
+      }
+      const nextArtifact = targets[index]
+      if (nextArtifact) {
+        activeArtifact = nextArtifact
+        activeHash = createHash('sha256')
+        chunkQueue = createHuangshanReadbackChunks({ artifact: nextArtifact })
+        index += 1
+      }
+    }
+
+    const artifact = chunkQueue.shift()
+    if (!artifact) {
+      const matched = results.every(item => item.matched)
+      sse(res, {
+        done: true,
+        status: matched ? 'success' : 'failure',
+        error: matched ? '' : 'Readback hash mismatch',
+        command: 'sftool read_flash',
+        elapsedMs: Date.now() - startedAt,
+        flashEvidence: {
+          status: matched ? 'verified' : 'mismatch',
+          port,
+          chip: 'SF32LB52',
+          memory: 'nor',
+          artifacts: results,
+        },
+        artifactSummary,
+      })
+      res.end()
+      return
+    }
+    const attempt = artifact.attempt || 1
+
+    let command
+    try {
+      command = createHuangshanReadbackVerifyCommand({ port, buildDir, outputDir, artifact })
+    } catch (error) {
+      sse(res, { done: true, status: 'failure', error: error.message })
+      res.end()
+      return
+    }
+
+    sse(res, { log: `Reading ${artifact.sourceName || artifact.name} from ${artifact.address} (${artifact.size} bytes), attempt ${attempt}` })
+    const child = spawn(command.command, command.args, {
+      cwd: command.cwd,
+      env: {
+        ...process.env,
+        SIFLI_SDK_PATH: paths.sdk,
+        PATH: [
+          join(process.env.HOME || '', '.sifli/tools/sftool/0.1.16'),
+          process.env.PATH || '',
+        ].filter(Boolean).join(':'),
+      },
+    })
+    child.stdout.on('data', chunk => {
+      for (const line of String(chunk).split(/\r?\n/)) {
+        if (line) sse(res, { log: line })
+      }
+    })
+    child.stderr.on('data', chunk => {
+      for (const line of String(chunk).split(/\r?\n/)) {
+        if (line) sse(res, { log: line })
+      }
+    })
+    child.on('close', code => {
+      if (code !== 0) {
+        if (attempt < HUANGSHAN_READBACK_MAX_ATTEMPTS) {
+          sse(res, { log: `${artifact.name} read failed, retrying (${attempt + 1}/${HUANGSHAN_READBACK_MAX_ATTEMPTS})` })
+          chunkQueue.unshift({ ...artifact, attempt: attempt + 1 })
+          runNext()
+          return
+        }
+        sse(res, {
+          done: true,
+          status: 'failure',
+          error: `${command.command} ${command.args.join(' ')} failed with exit code ${code}`,
+          command: [command.command, ...command.args].join(' '),
+          elapsedMs: Date.now() - startedAt,
+        })
+        res.end()
+        return
+      }
+      activeHash.update(readFileSync(command.outputPath))
+      runNext()
+    })
+  }
+
+  runNext()
+}
+
 function runLvglRender(body) {
   const paths = resolveWorkspace()
   const startedAt = Date.now()
@@ -522,6 +720,20 @@ function createServer() {
         })
       return
     }
+    if (req.method === 'POST' && req.url === '/huangshan/verify-readback') {
+      res.writeHead(200, corsHeaders({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      }))
+      readJson(req)
+        .then(body => runReadbackVerify(res, { port: body.port }))
+        .catch(error => {
+          sse(res, { done: true, status: 'failure', error: error.message })
+          res.end()
+        })
+      return
+    }
     if (req.method === 'POST' && req.url === '/huangshan/render-lvgl') {
       readJson(req)
         .then(body => json(res, 200, runLvglRender(body)))
@@ -559,6 +771,8 @@ export {
   createHuangshanBuildCommand,
   createHuangshanFlashCommand,
   createHuangshanMonitorSetupCommand,
+  createHuangshanReadbackChunks,
+  createHuangshanReadbackVerifyCommand,
   createServer,
   healthPayload,
   listHuangshanSerialPorts,

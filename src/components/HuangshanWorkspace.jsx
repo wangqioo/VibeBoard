@@ -16,6 +16,7 @@ import {
   loadHuangshanSerialPorts,
   monitorHuangshanSerial,
   renderHuangshanLvglPreview,
+  verifyHuangshanReadback,
 } from '../utils/huangshanCompiler'
 import './HuangshanWorkspace.css'
 
@@ -110,6 +111,8 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
   const [selectedPort, setSelectedPort] = useState(HUANGSHAN_BOARD_PROFILE.debug.defaultSerialPort)
   const [monitorBaud, setMonitorBaud] = useState(921600)
   const [flashState, setFlashState] = useState('idle')
+  const [verifyState, setVerifyState] = useState('idle')
+  const [readbackEvidence, setReadbackEvidence] = useState(null)
   const [monitorState, setMonitorState] = useState('idle')
   const [monitorAbort, setMonitorAbort] = useState(null)
   const [realPreview, setRealPreview] = useState(null)
@@ -172,6 +175,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
 
   function resetGeneratedState() {
     setBuildEvidence(null)
+    setReadbackEvidence(null)
     setBuildLog([])
     setSerialLog([])
     setRealPreview(null)
@@ -260,6 +264,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
   async function handleBuild() {
     setBuildState('building')
     setBuildLog([])
+    setReadbackEvidence(null)
     setSerialLog([])
     setBuildEvidence(null)
     setStatus('正在编译黄山派工程...')
@@ -296,6 +301,28 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
     } catch (error) {
       setFlashState('error')
       setStatus(error.message || '烧录失败')
+    }
+  }
+
+  async function handleVerifyReadback() {
+    setVerifyState('verifying')
+    setBuildLog([])
+    setReadbackEvidence(null)
+    setStatus(`正在读回校验 ${selectedPort}...`)
+    try {
+      const evidence = await verifyHuangshanReadback({
+        port: selectedPort,
+        baseUrl: huangshanServiceBaseUrl,
+        onStatus: setStatus,
+        onLog: line => setBuildLog(prev => [...prev, line]),
+      })
+      setReadbackEvidence(evidence)
+      setVerifyState('ok')
+      setStatus('读回校验通过')
+    } catch (error) {
+      setVerifyState('error')
+      setReadbackEvidence(error.buildEvidence?.flashEvidence || null)
+      setStatus(error.message || '读回校验失败')
     }
   }
 
@@ -339,6 +366,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
   const filePaths = Object.keys(files)
   const activeContent = files[activeFile] || ''
   const canFlash = buildEvidence?.status === 'success' && selectedPort && flashState !== 'flashing'
+  const canVerifyReadback = buildEvidence?.status === 'success' && selectedPort && verifyState !== 'verifying' && Boolean(huangshanServiceBaseUrl)
   const canMonitor = selectedPort && monitorState !== 'monitoring'
   const logState = flashState === 'error' || monitorState === 'error' ? 'error' : buildState
   const workflowSteps = createHuangshanWorkflowSteps({
@@ -376,6 +404,9 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
           <button className="huangshan-flash" onClick={handleFlash} disabled={!canFlash}>
             {flashState === 'flashing' ? '烧录中...' : '烧录'}
           </button>
+          <button className="huangshan-secondary" onClick={handleVerifyReadback} disabled={!canVerifyReadback}>
+            {verifyState === 'verifying' ? '校验中...' : '读回校验'}
+          </button>
         </div>
         {buildEvidence?.artifactSummary?.artifacts?.length > 0 && (
           <div className="huangshan-artifacts compact">
@@ -390,6 +421,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
             ))}
           </div>
         )}
+        <FlashEvidencePanel flashEvidence={readbackEvidence} />
       </aside>
 
       <section className="huangshan-command">
@@ -659,6 +691,28 @@ function TruthReportPanel({ report }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function FlashEvidencePanel({ flashEvidence }) {
+  if (!flashEvidence?.artifacts?.length) return null
+  return (
+    <div className="huangshan-flash-evidence">
+      <div className="huangshan-heading">Flash Evidence</div>
+      <div className="huangshan-flash-evidence-summary">
+        <span>{flashEvidence.status === 'verified' ? '读回一致' : '读回不一致'}</span>
+        <code>{flashEvidence.port}</code>
+      </div>
+      {flashEvidence.artifacts.map(item => (
+        <div key={`${item.name}-${item.address}`} className={`huangshan-flash-evidence-row ${item.matched ? 'matched' : 'mismatch'}`}>
+          <div>
+            <strong>{item.name}</strong>
+            <span>{item.address} / {formatArtifactSize(item.size)}</span>
+          </div>
+          <code>{String(item.actualSha256 || '').slice(0, 12)}</code>
+        </div>
+      ))}
     </div>
   )
 }

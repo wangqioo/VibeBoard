@@ -6,6 +6,8 @@ import {
   createHuangshanBuildCommand,
   createHuangshanFlashCommand,
   createHuangshanMonitorSetupCommand,
+  createHuangshanReadbackChunks,
+  createHuangshanReadbackVerifyCommand,
   healthPayload,
   listHuangshanSerialPorts,
   resolveWorkspace,
@@ -99,6 +101,54 @@ assert.deepEqual(command.args, [
 ])
 assert.equal(command.cwd, '/workspace/project/build_sf32lb52-lchspi-ulp_hcpu')
 
+const readback = createHuangshanReadbackVerifyCommand({
+  port: '/dev/cu.usbserial-110',
+  buildDir: '/workspace/project/build_sf32lb52-lchspi-ulp_hcpu',
+  outputDir: '/tmp/vibeboard-readback',
+  artifact: {
+    name: 'main.bin',
+    address: '0x12020000',
+    size: 2608744,
+    sha256: 'e313669960f70d46140f69fa69c7e28f4fbde81293c8403f9175212cd32c364c',
+  },
+})
+
+assert.equal(readback.command, 'sftool')
+assert.deepEqual(readback.args, [
+  '-p',
+  '/dev/cu.usbserial-110',
+  '-c',
+  'SF32LB52',
+  '-m',
+  'nor',
+  'read_flash',
+  '/tmp/vibeboard-readback/main.bin@0x12020000:2608744',
+])
+assert.equal(readback.cwd, '/workspace/project/build_sf32lb52-lchspi-ulp_hcpu')
+assert.equal(readback.expectedSha256, 'e313669960f70d46140f69fa69c7e28f4fbde81293c8403f9175212cd32c364c')
+assert.equal(readback.outputPath, '/tmp/vibeboard-readback/main.bin')
+
+const readbackChunks = createHuangshanReadbackChunks({
+  artifact: {
+    name: 'main.bin',
+    address: '0x12020000',
+    size: 600000,
+    sha256: 'e313669960f70d46140f69fa69c7e28f4fbde81293c8403f9175212cd32c364c',
+  },
+  chunkSize: 262144,
+})
+
+assert.deepEqual(readbackChunks.map(chunk => ({
+  name: chunk.name,
+  address: chunk.address,
+  size: chunk.size,
+  offset: chunk.offset,
+})), [
+  { name: 'main.bin.part000', address: '0x12020000', size: 262144, offset: 0 },
+  { name: 'main.bin.part001', address: '0x12060000', size: 262144, offset: 262144 },
+  { name: 'main.bin.part002', address: '0x120a0000', size: 75712, offset: 524288 },
+])
+
 const monitor = createHuangshanMonitorSetupCommand({
   port: '/dev/cu.usbserial-110',
   baud: 921600,
@@ -131,6 +181,13 @@ assert.equal(windowsBuild.label, '.\\scripts\\build.ps1')
 assert.throws(() => createHuangshanFlashCommand({
   port: '../bad',
   buildDir: '/workspace/project/build_sf32lb52-lchspi-ulp_hcpu',
+}), /Unsafe serial port/)
+
+assert.throws(() => createHuangshanReadbackVerifyCommand({
+  port: '../bad',
+  buildDir: '/workspace/project/build_sf32lb52-lchspi-ulp_hcpu',
+  outputDir: '/tmp/vibeboard-readback',
+  artifact: { name: 'main.bin', address: '0x12020000', size: 1, sha256: 'a'.repeat(64) },
 }), /Unsafe serial port/)
 
 assert.throws(() => createHuangshanMonitorSetupCommand({
