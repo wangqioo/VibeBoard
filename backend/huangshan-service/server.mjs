@@ -15,12 +15,21 @@ const REPO_PARENT = resolve(REPO_ROOT, '..')
 const PREVIEW_RUNNER_DIR = join(REPO_ROOT, 'backend/compiler-service/preview_runner')
 
 function json(res, status, payload) {
-  res.writeHead(status, { 'Content-Type': 'application/json' })
+  res.writeHead(status, corsHeaders({ 'Content-Type': 'application/json' }))
   res.end(JSON.stringify(payload))
 }
 
 function sse(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`)
+}
+
+function corsHeaders(headers = {}) {
+  return {
+    ...headers,
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  }
 }
 
 function readJson(req) {
@@ -422,6 +431,11 @@ function runLvglRender(body) {
 
 function createServer() {
   return http.createServer((req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, corsHeaders())
+      res.end()
+      return
+    }
     if (req.method === 'GET' && req.url === '/huangshan/health') {
       json(res, 200, healthPayload())
       return
@@ -431,11 +445,11 @@ function createServer() {
       return
     }
     if (req.method === 'POST' && req.url === '/huangshan/build') {
-      res.writeHead(200, {
+      res.writeHead(200, corsHeaders({
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
-      })
+      }))
       readJson(req)
         .then(body => runBuild(res, { files: body.files }))
         .catch(error => {
@@ -445,11 +459,11 @@ function createServer() {
       return
     }
     if (req.method === 'POST' && req.url === '/huangshan/flash') {
-      res.writeHead(200, {
+      res.writeHead(200, corsHeaders({
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
-      })
+      }))
       readJson(req)
         .then(body => runFlash(res, { port: body.port }))
         .catch(error => {
@@ -459,11 +473,11 @@ function createServer() {
       return
     }
     if (req.method === 'POST' && req.url === '/huangshan/monitor') {
-      res.writeHead(200, {
+      res.writeHead(200, corsHeaders({
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
-      })
+      }))
       readJson(req)
         .then(body => runMonitor(res, {
           port: body.port,

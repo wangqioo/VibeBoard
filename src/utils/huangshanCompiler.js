@@ -1,19 +1,25 @@
 import { createHuangshanBuildEvidence } from '../domain/huangshan/buildEvidence'
 
-export async function loadHuangshanHealth() {
-  const res = await fetch('/huangshan/health')
+function huangshanUrl(path, baseUrl = '') {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`
+  const base = String(baseUrl || '').trim().replace(/\/+$/, '')
+  return `${base}${cleanPath}`
+}
+
+export async function loadHuangshanHealth({ baseUrl } = {}) {
+  const res = await fetch(huangshanUrl('/huangshan/health', baseUrl))
   if (!res.ok) throw new Error(`Failed to load Huangshan service health: HTTP ${res.status}`)
   return res.json()
 }
 
-export async function loadHuangshanSerialPorts() {
-  const res = await fetch('/huangshan/serial-ports')
+export async function loadHuangshanSerialPorts({ baseUrl } = {}) {
+  const res = await fetch(huangshanUrl('/huangshan/serial-ports', baseUrl))
   if (!res.ok) throw new Error(`Failed to load Huangshan serial ports: HTTP ${res.status}`)
   return res.json()
 }
 
-export async function renderHuangshanLvglPreview({ displayName, description, files, tap } = {}) {
-  const res = await fetch('/huangshan/render-lvgl', {
+export async function renderHuangshanLvglPreview({ displayName, description, files, tap, baseUrl } = {}) {
+  const res = await fetch(huangshanUrl('/huangshan/render-lvgl', baseUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ displayName, description, files, tap }),
@@ -26,12 +32,12 @@ export async function renderHuangshanLvglPreview({ displayName, description, fil
   return payload
 }
 
-async function runHuangshanStream({ url, method = 'POST', body, initialStatus, onStatus, onLog, signal }) {
+async function runHuangshanStream({ url, baseUrl, method = 'POST', body, initialStatus, onStatus, onLog, signal }) {
   onStatus?.(initialStatus)
   const logLines = []
   const startedAt = Date.now()
 
-  const res = await fetch(url, {
+  const res = await fetch(huangshanUrl(url, baseUrl), {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -85,9 +91,10 @@ async function runHuangshanStream({ url, method = 'POST', body, initialStatus, o
   })
 }
 
-export async function monitorHuangshanSerial({ port, baud = 1000000, signal, onStatus, onLog } = {}) {
+export async function monitorHuangshanSerial({ port, baud = 1000000, signal, onStatus, onLog, baseUrl } = {}) {
   return runHuangshanStream({
     url: '/huangshan/monitor',
+    baseUrl,
     body: { port, baud },
     signal,
     initialStatus: `Connecting serial port ${port}...`,
@@ -96,9 +103,10 @@ export async function monitorHuangshanSerial({ port, baud = 1000000, signal, onS
   })
 }
 
-export async function buildHuangshanWorkspace({ files, onStatus, onLog } = {}) {
+export async function buildHuangshanWorkspace({ files, onStatus, onLog, baseUrl } = {}) {
   const result = await runHuangshanStream({
     url: '/huangshan/build',
+    baseUrl,
     body: { files },
     initialStatus: 'Connecting Huangshan build service...',
     onStatus,
@@ -107,9 +115,10 @@ export async function buildHuangshanWorkspace({ files, onStatus, onLog } = {}) {
   return result.evidence
 }
 
-export async function flashHuangshanWorkspace({ port, onStatus, onLog } = {}) {
+export async function flashHuangshanWorkspace({ port, onStatus, onLog, baseUrl } = {}) {
   const result = await runHuangshanStream({
     url: '/huangshan/flash',
+    baseUrl,
     body: { port },
     initialStatus: 'Connecting Huangshan flash service...',
     onStatus,

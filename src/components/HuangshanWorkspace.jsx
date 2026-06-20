@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { HUANGSHAN_BOARD_PROFILE, listHuangshanCapabilities } from '../domain/huangshan/boardProfile'
 import { createHuangshanAppFiles, normalizeHuangshanAppName } from '../domain/huangshan/appTemplate'
@@ -41,10 +41,16 @@ const HUANGSHAN_CAPABILITY_OPTIONS = [
   { value: 'motor', label: '马达' },
 ]
 
+const HUANGSHAN_BRIDGE_STORAGE_KEY = 'vibeboard-huangshan-bridge-url'
+
 function componentImplementationLabel(implementation) {
   if (implementation === 'real') return '真实'
   if (implementation === 'placeholder') return '占位'
   return '仅界面'
+}
+
+function normalizeBridgeUrl(value) {
+  return String(value || '').trim().replace(/\/+$/, '')
 }
 
 export default function HuangshanWorkspace({ settings, onOpenSettings }) {
@@ -75,8 +81,16 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
   const [renderState, setRenderState] = useState('idle')
   const [renderError, setRenderError] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [bridgeUrl, setBridgeUrl] = useState(() => {
+    try {
+      return localStorage.getItem(HUANGSHAN_BRIDGE_STORAGE_KEY) || ''
+    } catch {
+      return ''
+    }
+  })
 
   const appName = useMemo(() => normalizeHuangshanAppName(appDisplayName), [appDisplayName])
+  const huangshanServiceBaseUrl = useMemo(() => normalizeBridgeUrl(bridgeUrl), [bridgeUrl])
   const capabilities = useMemo(() => listHuangshanCapabilities(), [])
   const preview = useMemo(() => createHuangshanSemanticPreview({
     displayName: appDisplayName,
@@ -90,10 +104,23 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
   }), [builderConfig, buildEvidence, serialLog])
 
   useEffect(() => {
-    loadHuangshanHealth()
+    try {
+      const normalized = normalizeBridgeUrl(bridgeUrl)
+      if (normalized) {
+        localStorage.setItem(HUANGSHAN_BRIDGE_STORAGE_KEY, normalized)
+      } else {
+        localStorage.removeItem(HUANGSHAN_BRIDGE_STORAGE_KEY)
+      }
+    } catch {
+      // Local storage can be unavailable in strict browser modes.
+    }
+  }, [bridgeUrl])
+
+  const refreshHuangshanService = useCallback(() => {
+    loadHuangshanHealth({ baseUrl: huangshanServiceBaseUrl })
       .then(setHealth)
       .catch(error => setHealth({ ok: false, error: error.message }))
-    loadHuangshanSerialPorts()
+    loadHuangshanSerialPorts({ baseUrl: huangshanServiceBaseUrl })
       .then(payload => {
         const ports = payload.ports || []
         setSerialPorts(ports)
@@ -101,7 +128,11 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
         if (recommended) setSelectedPort(recommended.path)
       })
       .catch(() => setSerialPorts([]))
-  }, [])
+  }, [huangshanServiceBaseUrl])
+
+  useEffect(() => {
+    refreshHuangshanService()
+  }, [refreshHuangshanService])
 
   function resetGeneratedState() {
     setBuildEvidence(null)
@@ -171,7 +202,13 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
     setRenderError('')
     setStatus(safeTap ? `正在渲染点击 ${safeTap.x}, ${safeTap.y}...` : '正在渲染 LVGL 预览...')
     try {
-      const rendered = await renderHuangshanLvglPreview({ displayName: appDisplayName, description, files, tap: safeTap })
+      const rendered = await renderHuangshanLvglPreview({
+        displayName: appDisplayName,
+        description,
+        files,
+        tap: safeTap,
+        baseUrl: huangshanServiceBaseUrl,
+      })
       setRealPreview(rendered)
       setRenderState('ok')
       const cacheText = rendered.cache?.hit ? '命中缓存' : '已编译'
@@ -193,6 +230,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
     try {
       const evidence = await buildHuangshanWorkspace({
         files,
+        baseUrl: huangshanServiceBaseUrl,
         onStatus: setStatus,
         onLog: line => setBuildLog(prev => [...prev, line]),
       })
@@ -213,6 +251,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
     try {
       await flashHuangshanWorkspace({
         port: selectedPort,
+        baseUrl: huangshanServiceBaseUrl,
         onStatus: setStatus,
         onLog: line => setBuildLog(prev => [...prev, line]),
       })
@@ -233,6 +272,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
     monitorHuangshanSerial({
       port: selectedPort,
       baud: monitorBaud,
+      baseUrl: huangshanServiceBaseUrl,
       signal: controller.signal,
       onStatus: setStatus,
       onLog: line => {
@@ -326,6 +366,7 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
               <div className="huangshan-chat-subtitle">通过 MCP 或本地仓库修改黄山派应用源码</div>
             </div>
             <div className="huangshan-chat-header-actions">
+              <span className="huangshan-service-mode">{huangshanServiceBaseUrl ? 'LOCAL' : 'SERVER'}</span>
               <span className={`huangshan-status-dot ${health?.ok ? 'online' : 'offline'}`} title={health?.ok ? '编译服务已连接' : '编译服务未连接'} />
             </div>
           </div>
@@ -369,6 +410,14 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
 
         <div className="huangshan-device-compact">
           <label>
+            Bridge
+            <input
+              value={bridgeUrl}
+              onChange={event => setBridgeUrl(event.target.value)}
+              placeholder="http://127.0.0.1:8771"
+            />
+          </label>
+          <label>
             串口
             <select value={selectedPort} onChange={event => setSelectedPort(event.target.value)}>
               {serialPorts.length === 0 && <option value={selectedPort}>{selectedPort}</option>}
@@ -384,6 +433,10 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
               监视串口
             </button>
           )}
+          <button className="huangshan-secondary" type="button" onClick={refreshHuangshanService}>刷新设备</button>
+          <div className="huangshan-device-hint">
+            {huangshanServiceBaseUrl ? '本机 bridge 接管黄山派编译、烧录和串口。' : '留空走服务器；本机 USB 需填本地 bridge。'}
+          </div>
         </div>
 
         <button className="huangshan-advanced-toggle" onClick={() => setShowAdvanced(prev => !prev)}>

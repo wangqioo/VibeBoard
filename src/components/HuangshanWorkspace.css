@@ -104,6 +104,7 @@
 }
 
 .huangshan-device-compact select,
+.huangshan-device-compact input,
 .huangshan-section input,
 .huangshan-section textarea,
 .huangshan-section select {
@@ -115,6 +116,18 @@
   border-radius: 6px;
   padding: 9px;
   font: inherit;
+}
+
+.huangshan-device-compact button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.huangshan-device-hint {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .huangshan-section textarea {
@@ -185,6 +198,16 @@
 
 .huangshan-status-dot.offline {
   background: var(--text-muted);
+}
+
+.huangshan-service-mode {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
 }
 
 .huangshan-board-badge {
