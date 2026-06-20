@@ -1,4 +1,5 @@
 import { access } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
 
 import { readBuildEvidenceRecord } from './artifacts.mjs'
 import { requireObject } from './validate.mjs'
@@ -6,6 +7,9 @@ import { requireObject } from './validate.mjs'
 const SUPPORTED_BOARDS = new Set(['szpi_esp32s3'])
 const DEFAULT_BAUD_RATE = 460800
 const APP_OFFSET = 0x10000
+const BOARD_CHIPS = {
+  szpi_esp32s3: 'esp32s3',
+}
 
 export async function flashUsbTool(input = {}, adapters = {}) {
   const request = requireObject(input)
@@ -59,12 +63,10 @@ export async function flashUsbTool(input = {}, adapters = {}) {
   if (!request.portPath) {
     return blocked('port-required', 'portPath is required for confirmed USB flashing', { flashPlan })
   }
-  if (!adapters.flasher) {
-    return blocked('flasher-unavailable', 'No Node USB flasher adapter is configured', { flashPlan })
-  }
+  const flasher = adapters.flasher || esptoolFlasher
 
   try {
-    const result = await adapters.flasher({
+    const result = await flasher({
       boardId,
       projectId,
       portPath: request.portPath,
@@ -131,4 +133,68 @@ async function createFlashPlan(artifact = {}) {
   }
 
   return plan.sort((a, b) => a.offset - b.offset)
+}
+
+export async function esptoolFlasher({
+  boardId,
+  portPath,
+  baudRate = DEFAULT_BAUD_RATE,
+  flashFiles = [],
+  command = process.env.VIBEBOARD_ESPTOOL || 'esptool.py',
+} = {}) {
+  const startedAt = Date.now()
+  const chip = BOARD_CHIPS[boardId]
+  if (!chip) throw new Error(`unsupported boardId for esptool: ${boardId || '(missing)'}`)
+  if (!portPath) throw new Error('portPath is required')
+  if (!flashFiles.length) throw new Error('flashFiles are required')
+
+  const args = [
+    '--chip', chip,
+    '-p', portPath,
+    '-b', String(baudRate),
+    '--before', 'default_reset',
+    '--after', 'hard_reset',
+    'write_flash',
+    '--flash_mode', 'dio',
+    '--flash_size', '16MB',
+    '--flash_freq', '80m',
+  ]
+  for (const file of flashFiles) {
+    args.push(`0x${Number(file.offset).toString(16)}`, file.path)
+  }
+
+  const logs = await runCommand(command, args)
+  return {
+    status: 'success',
+    category: 'flashed',
+    logs,
+    elapsedMs: Date.now() - startedAt,
+  }
+}
+
+function runCommand(command, args) {
+  return new Promise((resolve, reject) => {
+    const logs = []
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+
+    child.stdout.on('data', chunk => collectLines(logs, chunk))
+    child.stderr.on('data', chunk => collectLines(logs, chunk))
+    child.on('error', reject)
+    child.on('close', code => {
+      if (code === 0) {
+        resolve(logs)
+        return
+      }
+      const error = new Error(`${command} exited with code ${code}`)
+      error.logs = logs
+      reject(error)
+    })
+  })
+}
+
+function collectLines(logs, chunk) {
+  const text = Buffer.from(chunk).toString('utf8')
+  for (const line of text.split(/\r?\n/)) {
+    if (line.trim()) logs.push(line)
+  }
 }
