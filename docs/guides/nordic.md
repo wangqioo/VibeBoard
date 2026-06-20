@@ -227,7 +227,7 @@ Cmd + Shift + R
 ```
 
 Without a hard refresh, the browser can keep an old JS bundle and submit stale
-generated code to the compiler service.
+project files to the compiler service.
 
 ## Current Real-Board State
 
@@ -399,7 +399,6 @@ Run these after Nordic changes:
 
 ```bash
 npm run test:nordic-app-template
-npm run test:nordic-ai-generation
 npm run test:nordic-build-log-summary
 npm run test:nordic-workspace-ui
 npm run test:nordic-compiler-service

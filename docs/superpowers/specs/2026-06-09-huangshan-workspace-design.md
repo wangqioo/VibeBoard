@@ -188,9 +188,13 @@ GUI_APP_MSG_ONSTART / ONRESUME / ONPAUSE / ONSTOP
 
 The existing `Codex_Test` app is the local golden template.
 
-## AI Write Surface
+## Local Agent Write Surface
 
-AI may write:
+Status: superseded for browser UX. Huangshan code changes are made by a local
+agent such as Codex or Claude Code through the repo/MCP workflow. The web UI
+only previews, builds, flashes, and collects evidence.
+
+Local agents may write:
 
 ```text
 src/gui_apps/<AppName>/main.c
@@ -199,7 +203,7 @@ optional src/gui_apps/<AppName>/*.h
 optional src/gui_apps/<AppName>/*.c
 ```
 
-AI must not write by default:
+Local agents must not write by default:
 
 ```text
 sifli-sdk/
@@ -313,11 +317,11 @@ The first successful flow should be:
 ```text
 User asks for a Huangshan app
   -> workspace selects huangshan_pi_sf32lb52 profile
-  -> AI generates app files only
+  -> local agent edits app files only
   -> Project Adapter validates and stages files
   -> Build Adapter runs SCons
   -> Build Evidence is shown in the web UI
-  -> AI can repair only generated app files
+  -> local agent can repair only app files
 ```
 
 Later flow:
@@ -327,7 +331,7 @@ Build success
   -> Flash Adapter downloads through CH340 UART
   -> Log Adapter monitors at 1000000 baud
   -> Device Evidence is attached to the conversation
-  -> AI repairs generated app files
+  -> local agent repairs app files
 ```
 
 ## Error Handling

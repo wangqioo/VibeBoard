@@ -8,9 +8,12 @@ const indexCss = await readFile(new URL('../src/index.css', import.meta.url), 'u
 
 assert.match(appSource, /VibeBoard Micro/)
 assert.match(appSource, /AI Hardware Workbench/)
-assert.match(appSource, /生成 \/ 编译 \/ 修复 \/ 烧录 \/ 设备证据/)
-assert.match(appSource, /AI 工作流/)
+assert.match(appSource, /本地改码 \/ 编译 \/ 烧录 \/ 预览 \/ 设备证据/)
+assert.match(appSource, /webCodeGenerationEnabled = ENABLE_LEGACY_WEB_AGENT && ENABLE_WEB_CODE_GENERATION/)
+assert.match(appSource, /Legacy Agent/)
+assert.doesNotMatch(appSource, /AI 工作流/)
 assert.match(appSource, /设备证据/)
+assert.match(appSource, /MCP/)
 assert.doesNotMatch(appSource, /ESP32 Vibe Coder/)
 assert.doesNotMatch(appSource, /🤖|📟|⚙/)
 

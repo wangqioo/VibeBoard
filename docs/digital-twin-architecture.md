@@ -9,7 +9,7 @@ simulation.
 The product should converge on this loop:
 
 ```text
-AI generates source
+Local agent writes source through repo/MCP
   -> semantic preview appears immediately
   -> real LVGL runtime preview renders generated UI
   -> board peripheral mocks drive UI state
@@ -23,8 +23,9 @@ AI generates source
 
 Status: implemented as the current `uiManifest` path.
 
-The AI returns application source plus a `uiManifest`. The browser renders the
-manifest inside the device shell without compiling firmware.
+A local agent or manual edit updates application source plus a `uiManifest`.
+The browser renders the manifest inside the device shell without compiling
+firmware.
 
 This level is useful for:
 
@@ -39,16 +40,16 @@ It is not proof that C/LVGL code compiles or behaves exactly like LVGL.
 
 Status: implemented for current-project preview feedback.
 
-When the user has an editable project open, the AI assistant treats feedback
-such as unclear sliders, blocked labels, small buttons, misplaced widgets, or
-unresponsive taps as a repair request against the current project instead of a
-new generation request. The repair prompt receives the current application
-source files, latest Program Manifest, semantic/LVGL preview context, active
-file, and recent digital twin logs.
+When the user has an editable project open, the local coding agent treats
+feedback such as unclear sliders, blocked labels, small buttons, misplaced
+widgets, or unresponsive taps as a repair request against the current project
+instead of a browser-side generation request. The agent receives the current
+application source files, latest Program Manifest, semantic/LVGL preview
+context, active file, and recent digital twin logs through the repo or MCP.
 
 The repair loop preserves the write boundary:
 
-- AI patches Application Source under `main/`.
+- Local agents patch Application Source under `main/`.
 - VibeBoard keeps system-owned project files under product control.
 - UI repairs should update `main/app_ui.c` / `main/app_ui.h` when LVGL code is
   involved.

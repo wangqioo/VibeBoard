@@ -11,7 +11,9 @@ Read these files before changing architecture or generation behavior:
 Important current rules:
 
 - Treat SZPI ESP32-S3 + ESP-IDF as the current supported product line.
-- AI-generated code may write Application Source under `main/`.
+- Web UI must not generate or patch code. Local agents such as Codex or
+  Claude Code may write Application Source under `main/` through the local
+  repo or MCP workflow.
 - VibeBoard owns System-Owned Project Files such as `CMakeLists.txt`,
   `sdkconfig.defaults`, `main/idf_component.yml`, `partitions.csv`, BSP files,
   and compiler templates.

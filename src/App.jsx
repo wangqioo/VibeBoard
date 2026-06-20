@@ -12,7 +12,7 @@ import { listPlatformBoards, getPlatformBoard } from './context/boardPlatform'
 import { TOOLCHAINS } from './context/boardContract'
 import { providerKeyForBaseUrl } from './utils/aiApi'
 import { buildDefaultSettings } from './config/aiDefaults'
-import { ENABLE_LEGACY_WEB_AGENT } from './config/productFlags'
+import { ENABLE_LEGACY_WEB_AGENT, ENABLE_WEB_CODE_GENERATION } from './config/productFlags'
 import { buildGeneratedConfig } from './utils/projectAssembly'
 import { isSourcePath } from './utils/filePlacement'
 import { normalizeGeneratedSourceFiles } from './utils/projectValidation'
@@ -118,6 +118,7 @@ export default function App() {
   const [latestCompileArtifact, setLatestCompileArtifact] = useState(null)
   const board = BOARDS[boardId]
   const generatedFiles = buildGeneratedConfig(boardId, selectedSkills)
+  const webCodeGenerationEnabled = ENABLE_LEGACY_WEB_AGENT && ENABLE_WEB_CODE_GENERATION
 
   const [projectFiles, setProjectFiles] = useState(() => getDefaultFiles(loadInitialBoardId()))
   const [activeFile, setActiveFile] = useState(() => {
@@ -262,7 +263,7 @@ export default function App() {
           </div>
           <div className="divider" />
           <div className="workflow-strip" aria-label="Micro workflow">
-            生成 / 编译 / 修复 / 烧录 / 设备证据
+            本地改码 / 编译 / 烧录 / 预览 / 设备证据
           </div>
           <div className="divider" />
           <div className="workspace-switcher">
@@ -337,7 +338,7 @@ export default function App() {
 
           <div className="right-pane">
             <div className="right-tabs">
-              {ENABLE_LEGACY_WEB_AGENT && (
+              {webCodeGenerationEnabled && (
                 <button className={`right-tab ${rightTab === 'chat' ? 'active' : ''}`} onClick={() => setRightTab('chat')}>
                   Legacy Agent
                 </button>
@@ -350,7 +351,7 @@ export default function App() {
               </button>
             </div>
             <div className="right-tab-content">
-              {ENABLE_LEGACY_WEB_AGENT && (
+              {webCodeGenerationEnabled && (
                 <div className={`right-tab-panel ${rightTab === 'chat' ? 'active' : ''}`}>
                   <ChatPanel
                     settings={settings}
@@ -387,7 +388,7 @@ export default function App() {
                     })
                     setPendingLogAnalysis(`请帮我分析以下 ESP32 设备日志，找出问题原因并给出修复建议：\n\n\`\`\`\n${logs}\n\`\`\``)
                     setPendingBuildRepair(prev => prev ? { ...prev, recentDeviceEvidence: deviceRepairContext } : prev)
-                    setRightTab(ENABLE_LEGACY_WEB_AGENT ? 'chat' : 'log')
+                    setRightTab(webCodeGenerationEnabled ? 'chat' : 'log')
                   }}
                 />
               </div>
@@ -417,7 +418,7 @@ export default function App() {
           manifest={latestManifest}
           initialFirmware={reusableCompileArtifact?.firmware || null}
           initialBuildEvidence={reusableCompileArtifact?.buildEvidence || null}
-          initialBuildStatus={reusableCompileArtifact ? `AI 已自动编译成功 · ${(reusableCompileArtifact.firmware.size / 1024).toFixed(1)} KB` : ''}
+          initialBuildStatus={reusableCompileArtifact ? `已自动编译成功 · ${(reusableCompileArtifact.firmware.size / 1024).toFixed(1)} KB` : ''}
           initialAutoFlash={Boolean(reusableCompileArtifact?.autoFlash)}
           onCompileArtifact={handleCompileArtifact}
           onConsumeInitialAutoFlash={() => {
@@ -435,7 +436,7 @@ export default function App() {
                   })
                 : null,
             })
-            setRightTab(ENABLE_LEGACY_WEB_AGENT ? 'chat' : 'log')
+            setRightTab(webCodeGenerationEnabled ? 'chat' : 'log')
           }}
           onClose={() => setShowCompile(false)}
         />

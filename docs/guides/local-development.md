@@ -78,7 +78,6 @@ Huangshan workspace:
 npm run test:huangshan-profile
 npm run test:huangshan-app-template
 npm run test:huangshan-app-builder
-npm run test:huangshan-ai-builder
 npm run test:huangshan-build-evidence
 npm run test:huangshan-build-artifacts
 npm run test:huangshan-workspace-files
