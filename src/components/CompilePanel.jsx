@@ -16,6 +16,7 @@ import { assembleCompileFiles } from '../utils/projectAssembly'
 import { OFFICIAL_EXAMPLES, getOfficialExample } from '../data/officialExamples'
 import { createBuildEvidence } from '../domain/evidence/buildEvidence'
 import { createDeliveryDeviceEvidence } from '../domain/evidence/deviceEvidence'
+import { createEvidencePackage, createEvidenceReportMarkdown } from '../domain/evidence/evidencePackage'
 import './CompilePanel.css'
 
 const BUILD = {
@@ -83,6 +84,30 @@ function copyTextFallback(text) {
   if (!ok) throw new Error('copy failed')
 }
 
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function createFirmwareArtifactSummary(firmware) {
+  if (!firmware) return null
+  return {
+    firmware: {
+      filename: firmware.name || 'firmware.bin',
+      size: firmware.size ?? null,
+      type: firmware.type || 'application/octet-stream',
+      buildEvidence: firmware.buildEvidence || null,
+    },
+  }
+}
+
 export default function CompilePanel({
   projectFiles: sourceProp,
   selectedSkills,
@@ -127,6 +152,7 @@ export default function CompilePanel({
   const [buildLog, setBuildLog] = useState([])
   const [copyState, setCopyState] = useState('idle')
   const [buildEvidence, setBuildEvidence] = useState(null)
+  const [latestDeviceEvidence, setLatestDeviceEvidence] = useState(null)
   const logEndRef = useRef(null)
   const autoFlashAttemptedRef = useRef(false)
   const officialExample = getOfficialExample(officialExampleId)
@@ -149,6 +175,7 @@ export default function CompilePanel({
     setRemoteState('idle')
     setFirmware(hasReusableProjectFirmware ? initialFirmware : null)
     setBuildEvidence(hasReusableProjectFirmware ? (initialBuildEvidence || initialFirmware.buildEvidence || null) : null)
+    setLatestDeviceEvidence(null)
     setErrorLog('')
     setStatus(hasReusableProjectFirmware ? (initialBuildStatus || `编译成功 · ${(initialFirmware.size / 1024).toFixed(1)} KB`) : '')
     setBuildState(hasReusableProjectFirmware ? 'ok' : 'idle')
@@ -200,6 +227,24 @@ export default function CompilePanel({
       .catch(() => { if (!cancelled) setDeviceInfo(null) })
     return () => { cancelled = true }
   }, [otaIp])
+
+  function recordDeviceEvidence(evidence) {
+    setLatestDeviceEvidence(evidence)
+    onDeviceEvidence?.(evidence)
+  }
+
+  function handleExportEvidenceReport() {
+    const pkg = createEvidencePackage({
+      boardId,
+      selectedSkills: selectedSkills || [],
+      manifest,
+      projectFiles: sourceProp || {},
+      buildEvidence,
+      deviceEvidence: latestDeviceEvidence,
+      artifact: createFirmwareArtifactSummary(firmware),
+    })
+    downloadTextFile(`vibeboard-esp32-evidence-${Date.now()}.md`, createEvidenceReportMarkdown(pkg))
+  }
 
   async function handleCompile() {
     setBuildState('building')
@@ -315,7 +360,7 @@ export default function CompilePanel({
         setOtaProgress(pct)
         setStatus(`推送中... ${pct}%`)
       })
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'wifi-ota',
         message: '固件推送成功，设备正在重启...',
         deliveryResult: { status: 'success', ip: otaIp, firmwareSize: firmware.size, progress: 100 },
@@ -325,7 +370,7 @@ export default function CompilePanel({
       setOtaState('ok')
       setDeviceInfo(null)
     } catch (e) {
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'wifi-ota',
         deliveryResult: { status: 'failure', error: e.message, ip: otaIp, firmwareSize: firmware.size, progress: otaProgress },
         deviceInfo,
@@ -357,7 +402,7 @@ export default function CompilePanel({
         setBleProgress(percent)
         setStatus(`BLE 烧录中... ${percent}%  (${(sent / 1024).toFixed(0)} / ${(total / 1024).toFixed(0)} KB)`)
       })
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'ble-ota',
         message: 'BLE 烧录成功，设备正在重启...',
         deliveryResult: { status: 'success', deviceName: session.deviceName, firmwareSize: firmware.size, progress: 100 },
@@ -366,7 +411,7 @@ export default function CompilePanel({
       setStatus('BLE 烧录成功，设备正在重启...')
       setBleState('ok')
     } catch (e) {
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'ble-ota',
         deliveryResult: { status: 'failure', error: e.message, deviceName: session?.deviceName, firmwareSize: firmware.size, progress: bleProgress },
         deviceInfo: session?.deviceName ? { name: session.deviceName } : null,
@@ -406,7 +451,7 @@ export default function CompilePanel({
           setTimeout(() => logEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
         },
       })
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'usb',
         message: 'USB 烧录完成，设备已复位',
         deliveryResult: { status: 'success', automatic, firmwareSize: firmware.size, progress: 100 },
@@ -414,7 +459,7 @@ export default function CompilePanel({
       setStatus('USB 烧录完成，设备已复位')
       setUsbState('ok')
     } catch (e) {
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'usb',
         deliveryResult: { status: 'failure', error: e.message, automatic, firmwareSize: firmware.size, progress: usbProgress },
       }))
@@ -463,7 +508,7 @@ export default function CompilePanel({
     const selectedDevice = remoteDevices.find(device => device.deviceId === remoteDeviceId)
     if (!isDeviceOnline(selectedDevice)) {
       setRemoteState('error')
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'remote-ota',
         deliveryResult: {
           status: 'failure',
@@ -488,7 +533,7 @@ export default function CompilePanel({
         deviceId: remoteDeviceId,
         firmwareId: remoteFirmware.firmwareId,
       })
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'remote-ota',
         message: '远程 OTA 已下发，等待设备领取',
         deliveryResult: { ...job, firmwareSize: firmware.size },
@@ -498,7 +543,7 @@ export default function CompilePanel({
       setRemoteState('queued')
       setStatus(`远程 OTA 已下发，等待设备领取：${job.jobId.slice(0, 8)}`)
     } catch (e) {
-      onDeviceEvidence?.(createDeliveryDeviceEvidence({
+      recordDeviceEvidence(createDeliveryDeviceEvidence({
         transport: 'remote-ota',
         deliveryResult: { status: 'failure', error: e.message, deviceId: remoteDeviceId, firmwareSize: firmware.size },
         deviceInfo: selectedDevice || { deviceId: remoteDeviceId },
@@ -518,7 +563,7 @@ export default function CompilePanel({
         if (cancelled) return
         setRemoteJob(job)
         if (job.status === 'done' || job.status === 'flashed' || job.status === 'rebooting') {
-          onDeviceEvidence?.(createDeliveryDeviceEvidence({
+          recordDeviceEvidence(createDeliveryDeviceEvidence({
             transport: 'remote-ota',
             message: `远程 OTA 状态：${job.status}`,
             deliveryResult: { ...job, firmwareSize: firmware?.size || null },
@@ -527,7 +572,7 @@ export default function CompilePanel({
           setRemoteState('done')
           setStatus(`远程 OTA 状态：${job.status}`)
         } else if (job.status === 'failed') {
-          onDeviceEvidence?.(createDeliveryDeviceEvidence({
+          recordDeviceEvidence(createDeliveryDeviceEvidence({
             transport: 'remote-ota',
             deliveryResult: { ...job, status: 'failure', error: job.error || '远程 OTA 失败', firmwareSize: firmware?.size || null },
             deviceInfo: remoteDevices.find(device => device.deviceId === job.deviceId) || { deviceId: job.deviceId },
@@ -718,6 +763,13 @@ export default function CompilePanel({
             <button className={`compile-btn primary ${b.cls}`} onClick={handleCompile} disabled={buildState === 'building'}>
               {b.label}
             </button>
+            <button
+              className="compile-btn download"
+              onClick={handleExportEvidenceReport}
+              disabled={!buildEvidence && !latestDeviceEvidence && !firmware}
+            >
+              导出证据报告
+            </button>
 
             {buildState === 'error' && compileMode === 'project' && onRepairBuildFailure && (
               <button
@@ -733,7 +785,7 @@ export default function CompilePanel({
                   onClose?.()
                 }}
               >
-                AI 修复编译错误
+                导出修复上下文
               </button>
             )}
           </div>

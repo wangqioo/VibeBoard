@@ -85,8 +85,8 @@ Local coding agent edits firmware
   coding agent.
 - Keep `src/utils/codeGeneration.js` only as legacy support until remaining ESP
   UI paths no longer import it.
-- Rename visible "Legacy Agent" surfaces where they remain, or make them
-  clearly secondary/debug-only.
+- Keep visible product surfaces free of legacy web-agent labels; archived
+  browser-agent code remains behind disabled product flags only.
 - Make every hardware workspace show whether actions target `SERVER` or
   `LOCAL`.
 - Keep Nordic visible only as experimental if it remains in the UI.

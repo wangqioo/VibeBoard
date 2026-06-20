@@ -302,7 +302,7 @@ export default function App() {
             )}
           </div>
           <button className={`settings-btn ${!hasConfig ? 'pulse' : ''}`} onClick={() => setShowSettings(true)}>
-            配置 AI
+            接口配置
           </button>
         </div>
       </header>
@@ -340,7 +340,7 @@ export default function App() {
             <div className="right-tabs">
               {webCodeGenerationEnabled && (
                 <button className={`right-tab ${rightTab === 'chat' ? 'active' : ''}`} onClick={() => setRightTab('chat')}>
-                  Legacy Agent
+                  归档助手
                 </button>
               )}
               <button className={`right-tab ${rightTab === 'log' ? 'active' : ''}`} onClick={() => setRightTab('log')}>

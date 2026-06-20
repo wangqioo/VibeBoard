@@ -9,6 +9,7 @@ import {
 } from '../domain/huangshan/appBuilder'
 import { createHuangshanSemanticPreview } from '../domain/huangshan/semanticPreview'
 import { createHuangshanTruthReport } from '../domain/huangshan/truthReport'
+import { createEvidencePackage, createEvidenceReportMarkdown } from '../domain/evidence/evidencePackage'
 import {
   buildHuangshanWorkspace,
   flashHuangshanWorkspace,
@@ -43,6 +44,23 @@ const HUANGSHAN_CAPABILITY_OPTIONS = [
 ]
 
 const HUANGSHAN_BRIDGE_STORAGE_KEY = 'vibeboard-huangshan-bridge-url'
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function createHuangshanEvidenceArtifact(buildEvidence) {
+  if (!buildEvidence?.artifactSummary) return null
+  return buildEvidence.artifactSummary
+}
 
 function componentImplementationLabel(implementation) {
   if (implementation === 'real') return '真实'
@@ -326,6 +344,28 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
     }
   }
 
+  function handleExportEvidenceReport() {
+    const pkg = createEvidencePackage({
+      boardId: HUANGSHAN_BOARD_PROFILE.id,
+      selectedSkills: builderConfig.components
+        .filter(component => component.enabled !== false)
+        .map(component => component.capability || component.type)
+        .filter(Boolean),
+      manifest: {
+        displayName: appDisplayName,
+        description,
+        appName,
+        bridgeUrl: huangshanServiceBaseUrl || null,
+      },
+      projectFiles: files,
+      buildEvidence,
+      flashEvidence: readbackEvidence,
+      previewEvidence: realPreview,
+      artifact: createHuangshanEvidenceArtifact(buildEvidence),
+    })
+    downloadTextFile(`vibeboard-huangshan-evidence-${Date.now()}.md`, createEvidenceReportMarkdown(pkg))
+  }
+
   function handleStartMonitor() {
     const controller = new AbortController()
     setMonitorAbort(controller)
@@ -406,6 +446,9 @@ export default function HuangshanWorkspace({ settings, onOpenSettings }) {
           </button>
           <button className="huangshan-secondary" onClick={handleVerifyReadback} disabled={!canVerifyReadback}>
             {verifyState === 'verifying' ? '校验中...' : '读回校验'}
+          </button>
+          <button className="huangshan-secondary" onClick={handleExportEvidenceReport} disabled={!buildEvidence && !readbackEvidence && !realPreview}>
+            导出报告
           </button>
         </div>
         {buildEvidence?.artifactSummary?.artifacts?.length > 0 && (

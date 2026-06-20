@@ -19,6 +19,9 @@ README short; add details here.
 ## Guides
 
 - [Local development](./guides/local-development.md)
+- [ESP32-S3 5 minute demo](./guides/esp32-s3-5-minute-demo.md)
+- [Huangshan Pi 5 minute demo](./guides/huangshan-pi-5-minute-demo.md)
+- [Sales demo](./guides/sales-demo.md)
 - [USB flashing](./guides/flashing.md)
 - [OTA workflows](./guides/ota.md)
 - [Compiler service](./guides/compiler-service.md)

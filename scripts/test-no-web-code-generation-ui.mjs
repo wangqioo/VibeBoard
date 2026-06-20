@@ -9,6 +9,10 @@ const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.me
 
 assert.match(flags, /ENABLE_WEB_CODE_GENERATION\s*=\s*false/)
 assert.match(app, /ENABLE_WEB_CODE_GENERATION/)
+assert.match(app, /webCodeGenerationEnabled = ENABLE_LEGACY_WEB_AGENT && ENABLE_WEB_CODE_GENERATION/)
+assert.doesNotMatch(app, /Legacy Agent/)
+assert.doesNotMatch(app, />\s*配置 AI\s*</)
+assert.doesNotMatch(app, />\s*AI 修复编译错误\s*</)
 
 for (const [name, source] of [['HuangshanWorkspace', huangshan], ['NordicWorkspace', nordic]]) {
   assert.doesNotMatch(source, /generateHuangshanBuilderConfig|generateNordicProjectWithAi/, `${name} must not import browser AI generation adapters`)
