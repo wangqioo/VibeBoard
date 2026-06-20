@@ -4,20 +4,25 @@
 
 VibeBoard is a hardware console plus local-agent integration layer. The product
 goal is to let local coding agents generate and repair firmware in the user's
-repo while VibeBoard provides trusted board context, ESP-IDF project assembly,
-compiler access, delivery operations, preview rendering, and structured
-build/device evidence.
+repo while VibeBoard provides trusted board context, compile access, delivery
+operations, preview rendering, serial monitoring, readback verification, and
+structured build/device evidence.
 
 The web app does not host the AI coding agent. It displays and controls hardware
 operations. Local agents use VibeBoard through MCP tools.
 
-The current product line is intentionally narrow:
+The current product line is intentionally narrow and evidence-first:
 
-- Board family: SZPI ESP32-S3 first.
-- Framework: ESP-IDF first.
+- Primary sellable samples: SZPI ESP32-S3 and Huangshan Pi / SiFli SF32LB52.
+- Frameworks: ESP-IDF for ESP32-S3; SiFli SDK/SCons for Huangshan Pi.
+- Nordic/Zephyr exists as an experimental workspace, but it is not the current
+  MVP focus.
 - Configuration ownership: VibeBoard owns build configuration and board support
   files; local agents write application source files unless a future trusted
   workflow explicitly expands the scope.
+- Hardware proof matters more than generated code volume. A platform is not
+  product-ready until compile, flash, and device evidence have been verified on
+  real hardware.
 
 ## Domain Terms
 
@@ -74,6 +79,20 @@ log, error category, failing file, failing line, and suggested repair context.
 Structured runtime output from the board: OTA result, BLE flash result, serial
 logs, WebSocket logs, device info, crashes, resets, and user-observed symptoms.
 
+**Flash Evidence**
+
+Structured proof of firmware delivery: flasher command, port, target board,
+written files, flash addresses, return code, elapsed time, and readback hashes
+when available.
+
+**Local Bridge**
+
+A local HTTP service on the user's machine that lets the web console access
+local SDKs, flash tools, USB serial ports, readback commands, and serial logs.
+Server-side services may compile firmware, but real USB flash and serial access
+must go through a local bridge because the cloud server cannot see the user's
+attached boards.
+
 **Repair Loop**
 
 The post-failure workflow where a local agent uses Build Evidence or Device
@@ -100,7 +119,10 @@ calibrate the simulation.
 - `src/utils/projectAssembly.js` generates ESP-IDF project files from selected
   skills.
 - `backend/compiler-service/server.py` performs server-side ESP-IDF builds.
+- `backend/huangshan-service/server.mjs` performs Huangshan Pi build, flash,
+  serial, LVGL render, and local bridge operations.
 - `docs/digital-twin-architecture.md` defines the fidelity ladder from
   semantic UI preview to real LVGL runtime and board-level peripheral mocks.
 - The current architecture is defined in
   `docs/superpowers/specs/2026-06-19-agent-mcp-hardware-console-design.md`.
+- The current product roadmap is defined in `docs/development-plan.md`.
